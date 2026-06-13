@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>API Tables</title>
+<style>
+  :root { --bg:#11141c; --panel:#161a22; --panel2:#1d222c; --border:#2a3040;
+    --text:#e8eaed; --muted:#9aa3b2; --blue:#5b8def; --accent:#e0b341; }
+  * { box-sizing: border-box; }
+  body { margin:0; height:100vh; display:flex; flex-direction:column;
+    font-family:-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); overflow:hidden; }
+  .bar { padding:11px 14px; border-bottom:1px solid var(--border); background:var(--panel);
+    display:flex; flex-wrap:wrap; gap:9px; align-items:center; }
+  select, .bar input { padding:7px 11px; border-radius:10px; border:1px solid rgba(0,0,0,.5);
+    background:#0a0c11; color:var(--text); font-size:13px; box-shadow: inset 0 2px 4px rgba(0,0,0,.45); }
+  select:focus, .bar input:focus { outline:none; border-color:var(--blue); box-shadow: inset 0 2px 4px rgba(0,0,0,.45), 0 0 0 3px rgba(91,141,239,.18); }
+  .bar input { width:130px; }
+  .bar label { font-size:11px; color:var(--muted); display:flex; flex-direction:column; gap:3px; }
+  button { color:#04122e; border:0; border-radius:10px; padding:8px 15px; font-weight:700; cursor:pointer; font-size:13px;
+    background: linear-gradient(180deg,#7ba5f2,var(--blue));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 2px 6px rgba(0,0,0,.4); }
+  button:active { transform: translateY(1px); }
+  button.ghost { background:linear-gradient(180deg,var(--panel2),var(--panel)); color:var(--text);
+    border:1px solid rgba(255,255,255,.08); font-weight:500;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 2px 5px rgba(0,0,0,.3); }
+  button:disabled { opacity:.4; cursor:default; }
+  .tablewrap { flex:1; overflow:auto; }
+  table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  th, td { border-bottom:1px solid var(--border); padding:7px 11px; text-align:left; white-space:nowrap;
+    max-width:340px; overflow:hidden; text-overflow:ellipsis; }
+  th { position:sticky; top:0; background:var(--panel2); color:var(--muted); font-weight:600;
+    text-transform:uppercase; font-size:10.5px; letter-spacing:.6px; z-index:1; }
+  tr:hover td { background:rgba(91,141,239,.07); }
+  td.mono, th { font-variant-numeric:tabular-nums; }
+  .pager { padding:9px 14px; border-top:1px solid var(--border); background:var(--panel);
+    display:flex; align-items:center; gap:12px; font-size:12.5px; color:var(--muted); }
+  .pager .spacer { flex:1; }
+  .hint { padding:40px; text-align:center; color:var(--muted); }
+  .pill { background:rgba(91,141,239,.14); color:var(--blue); border:1px solid var(--blue);
+    border-radius:12px; padding:1px 8px; font:11px ui-monospace,monospace; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <label>Table
+    <select id="table"></select>
+  </label>
+  <label id="filterWrap" style="flex-direction:row; gap:9px; align-items:flex-end;"></label>
+  <button id="load">Load</button>
+  <span class="spacer" style="flex:1"></span>
+</div>
+<div class="tablewrap"><div class="hint" id="hint">Pick a table and press Load.</div>
+  <table id="grid" style="display:none"><thead><tr id="head"></tr></thead><tbody id="rows"></tbody></table>
+</div>
+<div class="pager" id="pager" style="display:none">
+  <button class="ghost" id="prev">‹ Prev</button>
+  <button class="ghost" id="next">Next ›</button>
+  <span id="range"></span>
+  <span class="spacer"></span>
+  <span id="total" class="pill"></span>
+</div>
+
+<script>
+// Tables and their documented filters (exact-match, case-sensitive on the API).
+const TABLES = {
+  "customers":        { channel:["GDO","distributor","horeca"], status:["active","inactive","prospect"], search:"text" },
+  "opportunities":    { customer_id:"text", stage:["qualification","negotiation","won","lost"], owner:"text" },
+  "orders":           { customer_id:"text", status:["open","in_production","shipped","delivered","cancelled"] },
+  "invoices":         { customer_id:"text", status:["unpaid","paid","overdue"], order_id:"text" },
+  "calls":            { customer_id:"text", type:["sales","support"], outcome:["complaint_open","follow_up","order_placed","resolved"] },
+  "production-orders":{ customer_id:"text", sku:"text", status:["planned","in_progress","done","blocked"] },
+  "inventory":        { type:["finished_good","raw_material"], below_min:["true"], search:"text" },
+  "suppliers":        { category:["semolina","wheat","packaging","labels","ink","logistics"], search:"text" },
+  "bom":              { sku:"text" },
+  "shipments":        { customer_id:"text", order_id:"text", status:["in_transit","delivered","delayed"] },
+};
+const LIMIT = 50;
+let offset = 0, total = 0;
+
+const tableSel = document.getElementById('table');
+const filterWrap = document.getElementById('filterWrap');
+Object.keys(TABLES).forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; tableSel.appendChild(o); });
+
+function buildFilters() {
+  filterWrap.innerHTML = '';
+  const spec = TABLES[tableSel.value];
+  Object.entries(spec).forEach(([name, kind]) => {
+    const lab = document.createElement('label'); lab.style.cssText='flex-direction:column;gap:3px';
+    lab.appendChild(document.createTextNode(name));
+    let field;
+    if (Array.isArray(kind)) {
+      field = document.createElement('select'); field.dataset.f = name;
+      field.innerHTML = '<option value="">any</option>' + kind.map(v=>`<option>${v}</option>`).join('');
+    } else {
+      field = document.createElement('input'); field.dataset.f = name; field.placeholder = name;
+    }
+    lab.appendChild(field); filterWrap.appendChild(lab);
+  });
+}
+tableSel.onchange = () => { buildFilters(); offset = 0; };
+buildFilters();
+
+function fmt(v) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+async function load() {
+  const table = tableSel.value;
+  const params = new URLSearchParams({ limit: LIMIT, offset });
+  filterWrap.querySelectorAll('[data-f]').forEach(f => { if (f.value) params.set(f.dataset.f, f.value); });
+  document.getElementById('hint').textContent = 'Loading…';
+  document.getElementById('hint').style.display = 'block';
+  document.getElementById('grid').style.display = 'none';
+  try {
+    const res = await fetch(`/api/explore/${table}?` + params.toString());
+    const d = await res.json();
+    if (d.error) { document.getElementById('hint').textContent = 'Error: ' + d.error; return; }
+    const cols = d.columns || [];
+    total = (d.pagination && d.pagination.total) || (d.data||[]).length;
+    document.getElementById('head').innerHTML = cols.map(c=>`<th>${c}</th>`).join('');
+    document.getElementById('rows').innerHTML = (d.data||[]).map(row =>
+      '<tr>' + cols.map(c => `<td title="${fmt(row[c]).replace(/"/g,'&quot;')}">${fmt(row[c])}</td>`).join('') + '</tr>'
+    ).join('');
+    document.getElementById('hint').style.display = (d.data||[]).length ? 'none':'block';
+    if (!(d.data||[]).length) document.getElementById('hint').textContent = 'No rows.';
+    document.getElementById('grid').style.display = (d.data||[]).length ? 'table':'none';
+    document.getElementById('pager').style.display = 'flex';
+    const end = Math.min(offset + LIMIT, total);
+    document.getElementById('range').textContent = total ? `${offset+1}–${end}` : '0';
+    document.getElementById('total').textContent = `total ${total}`;
+    document.getElementById('prev').disabled = offset <= 0;
+    document.getElementById('next').disabled = offset + LIMIT >= total;
+  } catch (err) {
+    document.getElementById('hint').textContent = 'Error: ' + err;
+  }
+}
+document.getElementById('load').onclick = () => { offset = 0; load(); };
+document.getElementById('prev').onclick = () => { offset = Math.max(0, offset - LIMIT); load(); };
+document.getElementById('next').onclick = () => { offset += LIMIT; load(); };
+</script>
+</body>
+</html>

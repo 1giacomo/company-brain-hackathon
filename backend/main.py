@@ -10,14 +10,14 @@ import re
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 load_dotenv()
 
-from agent import graph, kb, loop  # noqa: E402  (after load_dotenv so env is populated)
+from agent import aldente, graph, kb, loop  # noqa: E402  (after load_dotenv so env is populated)
 
 app = FastAPI(title="Al Dente Company Brain")
 
@@ -26,11 +26,23 @@ _FILES = _STATIC / "files"
 _FILES.mkdir(parents=True, exist_ok=True)
 app.mount("/files", StaticFiles(directory=_FILES), name="files")
 
+_APPS_DIR = _STATIC / "apps"
 _KB_DIR = Path(__file__).resolve().parent / "data" / "kb"
 _DOC_ID = re.compile(r"DOC-\d{3}")
 
+# v2 "Al Dente OS" apps (window contents) and the API tables they can explore.
+_APPS = {"brain", "kb", "rag", "tables", "preview"}
+_TABLES = {
+    "customers": "/crm/customers", "opportunities": "/crm/opportunities",
+    "orders": "/crm/orders", "invoices": "/crm/invoices", "calls": "/calls",
+    "production-orders": "/erp/production-orders", "inventory": "/erp/inventory",
+    "suppliers": "/erp/suppliers", "bom": "/erp/bom", "shipments": "/erp/shipments",
+}
+
 # In-memory answer cache: the self-test repeats questions, so repeats are instant.
 _CACHE: dict[str, dict] = {}
+# Cache identical table-explorer queries to limit metered API traffic.
+_EXPLORE_CACHE: dict[str, dict] = {}
 
 
 @app.on_event("startup")
@@ -93,6 +105,76 @@ def kb_document(doc_id: str) -> HTMLResponse:
 <script>document.getElementById('doc').innerHTML = marked.parse({md_js});</script>
 </body></html>"""
     return HTMLResponse(page)
+
+
+@app.get("/apps/{name}", include_in_schema=False)
+def app_window(name: str) -> FileResponse:
+    """Serve a v2 app's HTML (loaded into a window iframe by the desktop shell)."""
+    if name not in _APPS:
+        raise HTTPException(status_code=404, detail="unknown app")
+    path = _APPS_DIR / f"{name}.html"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="not found")
+    return FileResponse(path)
+
+
+@app.get("/api/kb/list", include_in_schema=False)
+def api_kb_list() -> JSONResponse:
+    """List the knowledge-base documents (for the KB file-browser app)."""
+    return JSONResponse({"documents": kb.list_docs()})
+
+
+@app.get("/api/kb/doc/{doc_id}", include_in_schema=False)
+def api_kb_doc(doc_id: str) -> JSONResponse:
+    """Raw markdown of one document (for the Preview app to render itself)."""
+    if not _DOC_ID.fullmatch(doc_id):
+        raise HTTPException(status_code=404, detail="not found")
+    path = _KB_DIR / f"{doc_id}.md"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="not found")
+    text = path.read_text(encoding="utf-8")
+    title = text.splitlines()[0].lstrip("# ").strip() if text else doc_id
+    return JSONResponse({"doc_id": doc_id, "title": title, "markdown": text})
+
+
+@app.get("/api/rag", include_in_schema=False)
+def api_rag(query: str = "", k: int = 5) -> JSONResponse:
+    """Retrieval transparency: ranked docs + scores + which hard-filter fired."""
+    if not query.strip():
+        return JSONResponse({"query": "", "results": [], "filter_applied": []})
+    return JSONResponse(kb.search_debug(query, k=min(max(k, 1), 20)))
+
+
+@app.get("/api/explore/{table}", include_in_schema=False)
+def api_explore(table: str, request: Request) -> JSONResponse:
+    """Read-only proxy over a whitelisted Al Dente table, with pagination and the
+    table's documented filters passed through. Cached to limit metered traffic."""
+    if table not in _TABLES:
+        raise HTTPException(status_code=404, detail="unknown table")
+    params = {k: v for k, v in request.query_params.items() if v != ""}
+    try:
+        params["limit"] = min(int(params.get("limit", 50)), 200)
+        params["offset"] = max(int(params.get("offset", 0)), 0)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="limit/offset must be integers")
+    cache_key = table + "?" + "&".join(f"{k}={params[k]}" for k in sorted(params))
+    if cache_key in _EXPLORE_CACHE:
+        return JSONResponse(_EXPLORE_CACHE[cache_key])
+    try:
+        env = aldente.get(_TABLES[table], **params)
+    except Exception as e:  # noqa: BLE001 - incl. httpx timeouts; degrade gracefully, never 500
+        return JSONResponse({"error": f"{type(e).__name__}: {e}", "data": [], "columns": [],
+                             "pagination": {}})
+    rows = env.get("data", [])
+    columns: list[str] = []
+    for row in rows:
+        for col in row:
+            if col not in columns:
+                columns.append(col)
+    out = {"table": table, "columns": columns, "data": rows,
+           "pagination": env.get("pagination", {})}
+    _EXPLORE_CACHE[cache_key] = out
+    return JSONResponse(out)
 
 
 @app.get("/graph", include_in_schema=False)

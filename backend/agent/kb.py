@@ -98,3 +98,56 @@ def search(query: str, k: int = 3) -> list[dict[str, str]]:
 def warmup() -> None:
     """Build the index ahead of the first request (called at startup)."""
     _load()
+
+
+# --- introspection for the v2 UI (KB browser + RAG playground) ---------------
+
+def list_docs() -> list[dict[str, object]]:
+    """Metadata for every KB document (for the file-browser app)."""
+    _load()
+    out = []
+    for d in _DOCS:
+        out.append({
+            "doc_id": d.doc_id, "title": d.title, "filename": f"{d.doc_id}.md",
+            "bytes": len(d.text.encode("utf-8")),
+            "is_bio": d.is_bio, "fmt": d.fmt,
+        })
+    return sorted(out, key=lambda x: x["doc_id"])
+
+
+def search_debug(query: str, k: int = 5) -> dict[str, object]:
+    """Like search(), but expose BM25 scores and which hard-filter narrowed the
+    candidate set — powers the RAG transparency app."""
+    _load()
+    assert _BM25 is not None
+    q = query.lower()
+    skus = {s.upper() for s in _SKU_RE.findall(query)}
+    doc_ids = {d.upper() for d in _DOC_RE.findall(query)}
+    fired: list[str] = []
+    if doc_ids:
+        fired.append(f"DOC id pin ({', '.join(sorted(doc_ids))})")
+    if skus:
+        fired.append(f"SKU pin ({', '.join(sorted(skus))})")
+    if "bio" in q:
+        fired.append("Bio variant")
+    elif "250g" in q or "250 g" in q:
+        fired.append("250g format")
+    elif "500g" in q or "500 g" in q:
+        fired.append("500g format")
+
+    candidates = _hard_filter(query, _DOCS)
+    q_tokens = [t.lower() for t in _TOKEN_RE.findall(query)]
+    scores = _BM25.get_scores(q_tokens)
+    idx_by_doc = {id(d): i for i, d in enumerate(_DOCS)}
+    ranked = sorted(candidates, key=lambda d: scores[idx_by_doc[id(d)]], reverse=True)
+    results = [{
+        "doc_id": d.doc_id, "title": d.title,
+        "score": round(float(scores[idx_by_doc[id(d)]]), 3),
+    } for d in ranked[:k]]
+    return {
+        "query": query,
+        "filter_applied": fired or ["none — full corpus ranked"],
+        "candidate_count": len(candidates),
+        "total_docs": len(_DOCS),
+        "results": results,
+    }

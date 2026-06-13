@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Knowledge Base</title>
+<style>
+  :root { --bg:#13151c; --side:#1a1d26; --head:#20242e; --border:#2c313d;
+    --text:#e8eaed; --muted:#8b93a3; --accent:#3b82f6; --sel:#2f6fe0; }
+  * { box-sizing: border-box; }
+  body { margin:0; height:100vh; display:flex; font-family:-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--text); overflow:hidden; font-size:13px; }
+
+  /* Sidebar (Finder favorites) */
+  .sidebar { width:212px; flex:none; background:var(--side); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; padding:10px 0; overflow-y:auto; }
+  .sb-section { font-size:10.5px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted);
+    padding:10px 16px 5px; font-weight:600; }
+  .sb-item { display:flex; align-items:center; gap:9px; padding:6px 16px; cursor:pointer;
+    border-radius:7px; margin:1px 8px; }
+  .sb-item:hover { background:rgba(255,255,255,.05); }
+  .sb-item.active { background:var(--sel); color:#fff; }
+  .sb-item .ic { font-size:15px; }
+  .sb-item .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sb-item .ct { font:10.5px ui-monospace,monospace; color:var(--muted); }
+  .sb-item.active .ct { color:rgba(255,255,255,.8); }
+
+  /* Main pane */
+  .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .toolbar { height:44px; flex:none; display:flex; align-items:center; gap:12px; padding:0 14px;
+    background:var(--head); border-bottom:1px solid var(--border); }
+  .nav { display:flex; gap:4px; color:var(--muted); }
+  .nav button { background:none; border:0; color:var(--muted); font-size:15px; cursor:default; opacity:.5; }
+  .crumb { display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted); }
+  .crumb b { color:var(--text); font-weight:600; }
+  .toolbar .spacer { flex:1; }
+  .toolbar input { width:170px; padding:6px 10px; border-radius:8px; border:1px solid rgba(0,0,0,.4);
+    background:#0e1016; color:var(--text); font-size:12.5px; box-shadow: inset 0 1px 3px rgba(0,0,0,.5); }
+  .toolbar input:focus { outline:none; border-color:var(--accent); }
+
+  /* List view */
+  .list { flex:1; overflow-y:auto; }
+  .lhead, .row { display:grid; grid-template-columns: 1fr 190px 90px; align-items:center; }
+  .lhead { position:sticky; top:0; background:var(--head); border-bottom:1px solid var(--border);
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); z-index:1; }
+  .lhead > div { padding:7px 14px; }
+  .row { padding:0; cursor:default; border-bottom:1px solid rgba(255,255,255,.025); }
+  .row > div { padding:7px 14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row:nth-child(odd) { background:rgba(255,255,255,.018); }
+  .row:hover { background:rgba(255,255,255,.06); }
+  .row.selected { background:var(--sel); color:#fff; }
+  .row .name { display:flex; align-items:center; gap:9px; }
+  .row .name .fic { font-size:15px; }
+  .row .kind, .row .size { color:var(--muted); font-size:12px; }
+  .row.selected .kind, .row.selected .size { color:rgba(255,255,255,.85); }
+  .hint { padding:30px; text-align:center; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="sidebar" id="sidebar"></div>
+<div class="main">
+  <div class="toolbar">
+    <div class="nav"><button>‹</button><button>›</button></div>
+    <div class="crumb">🍝 Al Dente <span>▸</span> 📚 Knowledge Base <span>▸</span> <b id="crumb">All Documents</b></div>
+    <span class="spacer"></span>
+    <input id="q" placeholder="Search" autocomplete="off" />
+  </div>
+  <div class="list">
+    <div class="lhead"><div>Name</div><div>Kind</div><div>Size</div></div>
+    <div id="rows"></div>
+  </div>
+</div>
+
+<script>
+let docs = [], folder = 'all', filter = '';
+
+const CATS = [
+  { key: 'Product specifications', ic: '📦', kind: 'Spec sheet' },
+  { key: 'Price list',             ic: '💶', kind: 'Price list' },
+  { key: 'Customer requirements',  ic: '📋', kind: 'Capitolato' },
+  { key: 'Policies & procedures',  ic: '📑', kind: 'Policy' },
+  { key: 'Other',                  ic: '🗒️', kind: 'Document' },
+];
+function categorize(d) {
+  const t = d.title.toLowerCase();
+  if (t.includes('price list')) return 'Price list';
+  if (t.includes('spec') || t.includes('specification')) return 'Product specifications';
+  if (t.includes('capitolato') || t.includes('supply specification')) return 'Customer requirements';
+  if (t.includes('policy') || t.includes('procedure') || t.includes('plan') || t.includes('agreement') ||
+      t.includes('haccp') || t.includes('note') || t.includes('program') || t.includes('summary') ||
+      t.includes('monitoring')) return 'Policies & procedures';
+  return 'Other';
+}
+const kindOf = c => (CATS.find(x => x.key === c) || {}).kind || 'Document';
+const sizeOf = b => (b/1024).toFixed(1) + ' KB';
+
+function previewDoc(id) {
+  if (window.parent && window.parent !== window && window.parent.openPreview) window.parent.openPreview(id);
+  else window.open('/kb/' + id, '_blank');
+}
+
+function renderSidebar() {
+  const sb = document.getElementById('sidebar');
+  const counts = {}; docs.forEach(d => { const c = categorize(d); counts[c] = (counts[c]||0)+1; });
+  let html = `<div class="sb-section">Locations</div>
+    <div class="sb-item ${folder==='all'?'active':''}" data-f="all">
+      <span class="ic">📚</span><span class="nm">All Documents</span><span class="ct">${docs.length}</span></div>
+    <div class="sb-section">Folders</div>`;
+  CATS.forEach(c => {
+    if (!counts[c.key]) return;
+    html += `<div class="sb-item ${folder===c.key?'active':''}" data-f="${c.key}">
+      <span class="ic">${c.ic}</span><span class="nm">${c.key}</span><span class="ct">${counts[c.key]}</span></div>`;
+  });
+  sb.innerHTML = html;
+  sb.querySelectorAll('.sb-item').forEach(el => el.onclick = () => {
+    folder = el.dataset.f; document.getElementById('crumb').textContent =
+      folder === 'all' ? 'All Documents' : folder;
+    renderSidebar(); renderList();
+  });
+}
+
+function renderList() {
+  const rows = document.getElementById('rows');
+  const f = filter.toLowerCase();
+  const shown = docs.filter(d =>
+    (folder === 'all' || categorize(d) === folder) &&
+    (!f || d.title.toLowerCase().includes(f) || d.doc_id.toLowerCase().includes(f)));
+  if (!shown.length) { rows.innerHTML = '<div class="hint">No documents.</div>'; return; }
+  rows.innerHTML = shown.map(d => `
+    <div class="row" data-id="${d.doc_id}" tabindex="0">
+      <div class="name"><span class="fic">📄</span>${d.title}${d.is_bio ? ' 🌱' : ''}</div>
+      <div class="kind">${kindOf(categorize(d))}</div>
+      <div class="size">${sizeOf(d.bytes)}</div>
+    </div>`).join('');
+  rows.querySelectorAll('.row').forEach(el => {
+    el.onclick = () => {
+      rows.querySelectorAll('.row').forEach(r => r.classList.remove('selected'));
+      el.classList.add('selected');
+    };
+    el.ondblclick = () => previewDoc(el.dataset.id);
+  });
+}
+
+document.getElementById('q').addEventListener('input', e => { filter = e.target.value; renderList(); });
+
+fetch('/api/kb/list').then(r => r.json()).then(data => {
+  docs = (data.documents || []).sort((a,b) => a.doc_id.localeCompare(b.doc_id));
+  renderSidebar(); renderList();
+}).catch(() => { document.getElementById('rows').innerHTML = '<div class="hint">Could not load documents.</div>'; });
+</script>
+</body>
+</html>
