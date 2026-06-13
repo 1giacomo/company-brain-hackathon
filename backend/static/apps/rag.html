@@ -4,18 +4,23 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>RAG</title>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
 <style>
   :root { --bg:#11141c; --panel:#161a22; --panel2:#1d222c; --border:#2a3040;
     --text:#e8eaed; --muted:#9aa3b2; --teal:#33c2a0; --accent:#e0b341; }
   * { box-sizing: border-box; }
-  body { margin:0; height:100vh; display:flex; flex-direction:column;
-    font-family:-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); overflow:hidden; }
+  body { margin:0; height:100vh; display:flex; font-family:-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--text); overflow:hidden; }
+  .left { flex:1.15; display:flex; flex-direction:column; min-width:0; border-right:1px solid var(--border); }
+  .right { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .panel-title { padding:9px 16px; font-size:11px; text-transform:uppercase; letter-spacing:1px;
+    color:var(--muted); border-bottom:1px solid var(--border); background:var(--panel); }
+
   .bar { padding:14px 16px; border-bottom:1px solid var(--border); background:var(--panel); }
   .intro { font-size:12.5px; color:var(--muted); margin-bottom:10px; }
   form { display:flex; gap:9px; }
   input { flex:1; padding:10px 13px; border-radius:12px; border:1px solid rgba(0,0,0,.5);
-    background:#0a0c11; color:var(--text); font-size:14px;
-    box-shadow: inset 0 2px 5px rgba(0,0,0,.5); }
+    background:#0a0c11; color:var(--text); font-size:14px; box-shadow: inset 0 2px 5px rgba(0,0,0,.5); }
   input:focus { outline:none; border-color:var(--teal); box-shadow: inset 0 2px 5px rgba(0,0,0,.5), 0 0 0 3px rgba(51,194,160,.18); }
   button { color:#06241d; border:0; border-radius:12px; padding:0 18px; font-weight:700; cursor:pointer; font-size:14px;
     background: linear-gradient(180deg,#54d4b4,var(--teal));
@@ -43,18 +48,39 @@
   .scorebar > div { height:100%; background:linear-gradient(90deg,var(--teal),#7ee0c8); }
   .rank { width:20px; color:var(--muted); font:11px ui-monospace,monospace; text-align:right; }
   .hint { color:var(--muted); font-size:13px; text-align:center; padding:40px; }
+
+  /* Knowledge graph (right pane) */
+  #graph { flex:1; min-height:0; }
+  .legend { padding:9px 16px; display:flex; flex-wrap:wrap; gap:12px; font-size:11.5px;
+    color:var(--muted); border-top:1px solid var(--border); background:var(--panel); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
 </style>
 </head>
 <body>
-<div class="bar">
-  <div class="intro">Inspect retrieval: BM25 ranking over whole documents, with the <b>hard variant filter</b> (SKU / Bio / format) that disambiguates near-identical spec sheets before ranking.</div>
-  <form id="form">
-    <input id="q" placeholder="e.g. shelf life of Spaghetti n.5 500g (PAS-SPA-500)" autocomplete="off" />
-    <button type="submit">Search</button>
-  </form>
-  <div class="examples" id="examples"></div>
+<div class="left">
+  <div class="bar">
+    <div class="intro">Inspect retrieval: BM25 ranking over whole documents, with the <b>hard variant filter</b> (SKU / Bio / format) that disambiguates near-identical spec sheets before ranking.</div>
+    <form id="form">
+      <input id="q" placeholder="e.g. shelf life of Spaghetti n.5 500g (PAS-SPA-500)" autocomplete="off" />
+      <button type="submit">Search</button>
+    </form>
+    <div class="examples" id="examples"></div>
+  </div>
+  <div class="body"><div class="hint" id="hint">Type a query to see what the knowledge base returns.</div><div id="results"></div></div>
 </div>
-<div class="body"><div class="hint" id="hint">Type a query to see what the knowledge base returns.</div><div id="results"></div></div>
+
+<div class="right">
+  <div class="panel-title">Knowledge graph · customers ↔ products ↔ raw materials ↔ suppliers</div>
+  <div id="graph"></div>
+  <div class="legend">
+    <span><i class="dot" style="background:#e0b341"></i>Customer</span>
+    <span><i class="dot" style="background:#5b8def"></i>Channel</span>
+    <span><i class="dot" style="background:#4caf7d"></i>Product</span>
+    <span><i class="dot" style="background:#c98b3a"></i>Raw material</span>
+    <span><i class="dot" style="background:#c0392b"></i>Supplier</span>
+  </div>
+</div>
 
 <script>
 const EXAMPLES = [
@@ -113,6 +139,40 @@ async function run() {
   }
 }
 document.getElementById('form').onsubmit = e => { e.preventDefault(); run(); };
+
+// ---- Knowledge graph ----
+const GROUP_COLORS = {
+  customer: '#e0b341', channel: '#5b8def', product: '#4caf7d',
+  raw_material: '#c98b3a', supplier: '#c0392b',
+};
+(async function loadGraph() {
+  try {
+    const res = await fetch('/graph');
+    const g = await res.json();
+    if (!g.nodes || !g.nodes.length) {
+      document.getElementById('graph').innerHTML = '<p style="color:#9aa3b2;padding:20px">Graph unavailable.</p>';
+      return;
+    }
+    const nodes = g.nodes.map(n => ({
+      id: n.id, label: n.label, group: n.group,
+      color: GROUP_COLORS[n.group] || '#777',
+      shape: n.group === 'channel' ? 'diamond' : (n.group === 'supplier' ? 'square' : 'dot'),
+      value: n.group === 'channel' ? 30 : 12,
+      font: { color: '#e8eaed', size: 12 },
+    }));
+    const edges = g.edges.map(e => ({
+      from: e.from, to: e.to, arrows: 'to',
+      color: { color: '#3a4150', opacity: 0.6 }, width: 0.7,
+    }));
+    new vis.Network(document.getElementById('graph'), { nodes, edges }, {
+      physics: { stabilization: true, barnesHut: { gravitationalConstant: -8000, springLength: 110 } },
+      interaction: { hover: true, tooltipDelay: 120 },
+      nodes: { borderWidth: 0, scaling: { min: 8, max: 34 } },
+    });
+  } catch (err) {
+    document.getElementById('graph').innerHTML = `<p style="color:#9aa3b2;padding:20px">Graph error: ${err}</p>`;
+  }
+})();
 </script>
 </body>
 </html>
