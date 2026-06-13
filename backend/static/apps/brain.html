@@ -386,6 +386,50 @@
       animation: bob 1s ease-in-out infinite;
     }
 
+    /* Easter egg: blast off and land like a rocket */
+    .rocket-wrap {
+      position: relative;
+    }
+
+    .rocket-wrap.launch {
+      animation: rocket 2.2s cubic-bezier(.4, 0, .3, 1) both;
+    }
+
+    .flame {
+      position: absolute;
+      left: 50%;
+      bottom: 4px;
+      transform: translateX(-50%) scaleY(0);
+      transform-origin: top center;
+      width: 20px;
+      height: 40px;
+      background: linear-gradient(to bottom, #fff3b0, #ff9500 45%, #ff3d00);
+      clip-path: polygon(50% 100%, 12% 38%, 30% 48%, 50% 0, 70% 48%, 88% 38%);
+      filter: blur(.4px);
+      opacity: 0;
+      z-index: -1;
+    }
+
+    .rocket-wrap.launch .flame {
+      opacity: 1;
+      animation: flicker .09s linear infinite;
+    }
+
+    @keyframes rocket {
+      0%   { transform: translateY(0) rotate(0); }
+      14%  { transform: translateY(-18px) rotate(-3deg); }   /* crouch + tilt */
+      30%  { transform: translateY(-460px) rotate(2deg); }   /* blast off, out of view */
+      48%  { transform: translateY(-460px) rotate(0); }      /* hang above */
+      82%  { transform: translateY(16px); }                  /* descend, slight overshoot */
+      92%  { transform: translateY(-5px); }                  /* bounce */
+      100% { transform: translateY(0); }                     /* touchdown */
+    }
+
+    @keyframes flicker {
+      0%, 100% { transform: translateX(-50%) scaleY(1) scaleX(1); }
+      50%      { transform: translateX(-50%) scaleY(.65) scaleX(.85); }
+    }
+
     .bot-eyes {
       transform-box: fill-box;
       transform-origin: center;
@@ -483,6 +527,8 @@
     <!-- Companion buddy -->
     <div id="buddy">
       <div class="bubble" id="bubble"></div>
+      <div class="rocket-wrap" id="rocketWrap">
+      <div class="flame"></div>
       <svg class="bot" id="bot" viewBox="0 0 90 100" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="botBody" x1="0" y1="0" x2="1" y2="0.4">
@@ -509,6 +555,7 @@
         <!-- smile -->
         <path d="M33 64 Q45 75 57 64" fill="none" stroke="#1b1d22" stroke-width="3" stroke-linecap="round" />
       </svg>
+      </div>
     </div>
   </div>
 
@@ -536,8 +583,20 @@
       buddy.classList.toggle('thinking', on);
       if (on) say("Digging through the data…", true);
     }
-    document.getElementById('bot').addEventListener('click', () =>
-      say(IDLE_TIPS[Math.floor(Math.random() * IDLE_TIPS.length)]));
+    // Click Fusilli: shows a tip — but every 3rd click it blasts off like a rocket 🚀
+    let botClicks = 0;
+    function launchRocket() {
+      const wrap = document.getElementById('rocketWrap');
+      if (wrap.classList.contains('launch')) return;  // already mid-flight
+      say("🚀 To the moon! …and back.", true);
+      wrap.classList.add('launch');
+      setTimeout(() => wrap.classList.remove('launch'), 2300);
+    }
+    document.getElementById('bot').addEventListener('click', () => {
+      botClicks++;
+      if (botClicks % 3 === 0) launchRocket();
+      else say(IDLE_TIPS[Math.floor(Math.random() * IDLE_TIPS.length)]);
+    });
     setTimeout(() => say("Ciao! Ask me anything 🍝"), 700);
 
     const EXAMPLES = [
