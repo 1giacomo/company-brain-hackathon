@@ -19,10 +19,13 @@ BASE_URL = os.environ.get("MOCK_API_BASE_URL", "https://aldente.yellowtest.it").
 TOKEN = os.environ.get("MOCK_API_TOKEN", "")
 MAX_LIMIT = 200  # hard cap documented in API.md
 
+# Short timeout: the API normally responds <1s. Tool execution happens between
+# LLM calls and isn't budget-checked mid-round, so a stalled API call must fail
+# fast rather than eat the 30s wall (PLAN_V3.md §A).
 _client = httpx.Client(
     base_url=BASE_URL,
     headers={"Authorization": f"Bearer {TOKEN}"},
-    timeout=httpx.Timeout(12.0, connect=5.0),
+    timeout=httpx.Timeout(7.0, connect=4.0),
 )
 
 
