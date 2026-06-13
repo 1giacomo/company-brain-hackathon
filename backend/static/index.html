@@ -5,87 +5,135 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Al Dente OS</title>
 <style>
+  /* ── Skeuomorphic design system (2026-27 direction: tactile, material, depth) ──
+     Everything is a real surface: layered shadow for lift, a 1px top light edge +
+     inset sheen for the bevel, glass blur for translucency, squircle corners. */
   :root {
-    --bg: #0c0e13; --bg2: #11141c; --dot: #232838;
-    --panel: #161a22; --panel2: #1d222c; --border: #2a3040;
-    --text: #e8eaed; --muted: #9aa3b2;
+    --bg: #0a0c12; --bg2: #0e1119;
+    --panel: #181c26; --panel2: #20252f; --border: #333a48;
+    --text: #eef0f3; --muted: #9aa3b2;
+    --radius: 20px;            /* squircle-ish window radius */
+    --radius-sm: 13px;
+    /* Reusable material recipes */
+    --bevel: inset 0 1px 0 rgba(255,255,255,.10), inset 0 0 0 1px rgba(255,255,255,.03),
+             inset 0 -14px 30px rgba(0,0,0,.25);
+    --lift: 0 1px 1px rgba(0,0,0,.4), 0 10px 24px rgba(0,0,0,.4), 0 30px 70px rgba(0,0,0,.55);
+    --glass: linear-gradient(160deg, rgba(40,46,60,.78), rgba(20,24,32,.82));
+    --sheen: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 42%);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; }
   body {
     font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text);
     background:
-      radial-gradient(circle at 50% 0%, #1a1f2e 0%, var(--bg) 60%),
-      var(--bg);
+      radial-gradient(120% 90% at 28% -10%, #232a42 0%, transparent 55%),
+      radial-gradient(120% 90% at 100% 110%, #1d2335 0%, transparent 55%),
+      linear-gradient(160deg, #11141d 0%, var(--bg) 70%);
     user-select: none;
   }
-  /* Dotted overlay */
+  /* Dotted layer + film grain for material texture */
   #desktop {
     position: fixed; inset: 0;
-    background-image: radial-gradient(var(--dot) 1.4px, transparent 1.4px);
-    background-size: 24px 24px; background-position: -12px -12px;
+    background-image: radial-gradient(rgba(120,135,175,.16) 1.4px, transparent 1.4px);
+    background-size: 26px 26px; background-position: -13px -13px;
+  }
+  #desktop::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .04;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
-  /* Top menu bar */
+  /* Top menu bar — frosted glass slab */
   #menubar {
-    position: fixed; top: 0; left: 0; right: 0; height: 32px; z-index: 9000;
+    position: fixed; top: 0; left: 0; right: 0; height: 34px; z-index: 9000;
     display: flex; align-items: center; gap: 16px; padding: 0 16px;
-    background: rgba(18,21,28,.72); backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border); font-size: 13px;
+    background: rgba(16,19,27,.6); backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 1px 10px rgba(0,0,0,.35);
+    font-size: 13px;
   }
-  #menubar .brand { font-weight: 700; letter-spacing: .4px; }
+  #menubar .brand { font-weight: 700; letter-spacing: .4px;
+    text-shadow: 0 1px 2px rgba(0,0,0,.6); }
   #menubar .brand .pasta { margin-right: 7px; }
   #menubar .spacer { flex: 1; }
   #menubar .clock { color: var(--muted); font-variant-numeric: tabular-nums; }
 
   /* Desktop icons */
-  #icons { position: fixed; top: 52px; left: 26px; z-index: 10;
-    display: flex; flex-direction: column; gap: 26px; }
-  .icon { width: 96px; display: flex; flex-direction: column; align-items: center;
-    gap: 8px; cursor: pointer; border-radius: 12px; padding: 8px 4px; }
-  .icon:hover { background: rgba(255,255,255,.05); }
-  .icon .art { width: 66px; height: 66px; filter: drop-shadow(0 6px 14px rgba(0,0,0,.55));
-    transition: transform .15s ease; }
-  .icon:hover .art { transform: translateY(-3px) scale(1.05); }
+  #icons { position: fixed; top: 56px; left: 26px; z-index: 10;
+    display: flex; flex-direction: column; gap: 24px; }
+  .icon { width: 100px; display: flex; flex-direction: column; align-items: center;
+    gap: 9px; cursor: pointer; border-radius: 16px; padding: 9px 4px;
+    transition: background .15s ease; }
+  .icon:hover { background: rgba(255,255,255,.06); }
+  .icon .art { width: 70px; height: 70px;
+    filter: drop-shadow(0 8px 16px rgba(0,0,0,.6)) drop-shadow(0 2px 3px rgba(0,0,0,.5));
+    transition: transform .18s cubic-bezier(.2,.9,.3,1.4); }
+  .icon:hover .art { transform: translateY(-4px) scale(1.07); }
   .icon .label { font-size: 12.5px; text-align: center; line-height: 1.2;
-    text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+    text-shadow: 0 1px 3px rgba(0,0,0,.85); }
 
-  /* Windows */
+  /* Windows — glass panels with bevel + lift, squircle corners */
   .window { position: fixed; min-width: 360px; min-height: 240px;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-    box-shadow: 0 24px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.02) inset;
-    display: flex; flex-direction: column; overflow: hidden; }
+    background: var(--glass); backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius);
+    box-shadow: var(--lift), var(--bevel);
+    display: flex; flex-direction: column; overflow: hidden;
+    transition: box-shadow .2s ease; }
   .window.minimized { display: none; }
-  .titlebar { height: 38px; flex: none; display: flex; align-items: center; gap: 10px;
-    padding: 0 10px 0 13px; background: linear-gradient(var(--panel2), var(--panel));
-    border-bottom: 1px solid var(--border); cursor: grab; }
+  .window.focused { box-shadow: var(--lift), var(--bevel),
+    0 0 0 1px rgba(255,255,255,.08), 0 0 40px rgba(120,150,255,.10); }
+  .titlebar { height: 42px; flex: none; display: flex; align-items: center; gap: 10px;
+    padding: 0 11px 0 14px; cursor: grab; position: relative;
+    background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0) 55%),
+      linear-gradient(180deg, var(--panel2), var(--panel));
+    border-bottom: 1px solid rgba(0,0,0,.4);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
   .titlebar.grabbing { cursor: grabbing; }
-  .titlebar .ti { width: 18px; height: 18px; flex: none; }
+  .titlebar .ti { width: 19px; height: 19px; flex: none;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
   .titlebar .tt { font-size: 13px; font-weight: 600; flex: 1; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis; }
-  .titlebar .btns { display: flex; gap: 7px; }
-  .tbtn { width: 13px; height: 13px; border-radius: 50%; border: none; cursor: pointer;
-    padding: 0; position: relative; }
-  .tbtn.min { background: #f1c40f; } .tbtn.close { background: #e0533d; }
-  .tbtn:hover { filter: brightness(1.15); }
+    overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+  .titlebar .btns { display: flex; gap: 8px; }
+  /* Glossy traffic-light buttons */
+  .tbtn { width: 14px; height: 14px; border-radius: 50%; border: none; cursor: pointer;
+    padding: 0; position: relative;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.6), inset 0 -2px 3px rgba(0,0,0,.35),
+      0 1px 2px rgba(0,0,0,.5); }
+  .tbtn::after { content: ""; position: absolute; left: 2.5px; top: 1.5px;
+    width: 6px; height: 4px; border-radius: 50%; background: rgba(255,255,255,.65); }
+  .tbtn.min { background: radial-gradient(circle at 50% 30%, #ffd44d, #e0a31a); }
+  .tbtn.close { background: radial-gradient(circle at 50% 30%, #ff7a63, #d63f29); }
+  .tbtn:hover { filter: brightness(1.12); }
   .window iframe { flex: 1; width: 100%; border: 0; background: var(--bg2); }
-  .resize { position: absolute; width: 16px; height: 16px; right: 0; bottom: 0;
+  .resize { position: absolute; width: 18px; height: 18px; right: 0; bottom: 0;
     cursor: nwse-resize; z-index: 2; }
-  .resize::after { content: ""; position: absolute; right: 3px; bottom: 3px;
-    width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); }
+  .resize::after { content: ""; position: absolute; right: 4px; bottom: 4px;
+    width: 7px; height: 7px; border-right: 2px solid rgba(255,255,255,.25);
+    border-bottom: 2px solid rgba(255,255,255,.25); }
 
-  /* Dock */
-  #dock { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
-    z-index: 9000; display: flex; gap: 10px; padding: 8px 12px; min-height: 18px;
-    background: rgba(22,26,34,.7); backdrop-filter: blur(14px);
-    border: 1px solid var(--border); border-radius: 16px; transition: opacity .2s; }
+  /* Dock — heavy frosted glass tray */
+  #dock { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 9000; display: flex; gap: 10px; padding: 9px 13px; min-height: 18px;
+    background: rgba(20,24,33,.55); backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgba(255,255,255,.09); border-radius: 22px;
+    box-shadow: var(--lift), inset 0 1px 0 rgba(255,255,255,.14);
+    transition: opacity .25s; }
   #dock:empty { opacity: 0; }
   .dock-item { display: flex; align-items: center; gap: 7px; cursor: pointer;
-    background: rgba(255,255,255,.04); border: 1px solid var(--border); color: var(--text);
-    border-radius: 10px; padding: 5px 11px 5px 7px; font-size: 12.5px; }
-  .dock-item:hover { background: rgba(255,255,255,.1); }
-  .dock-item img { width: 18px; height: 18px; }
-  .dock-item .live { width: 5px; height: 5px; border-radius: 50%; background: #4caf7d; }
+    background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.02));
+    border: 1px solid rgba(255,255,255,.08); color: var(--text);
+    border-radius: 13px; padding: 6px 12px 6px 8px; font-size: 12.5px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.3);
+    transition: transform .12s ease, background .15s ease; }
+  .dock-item:hover { background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.05));
+    transform: translateY(-2px); }
+  .dock-item img, .dock-item .art { width: 19px; height: 19px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+  .dock-item .live { width: 5px; height: 5px; border-radius: 50%; background: #4caf7d;
+    box-shadow: 0 0 6px #4caf7d; }
 </style>
 </head>
 <body>
@@ -179,6 +227,7 @@ let zTop = 100, openWins = {}, cascade = 0;
 function focusWin(id) {
   const w = openWins[id]; if (!w) return;
   w.el.style.zIndex = ++zTop;
+  Object.values(openWins).forEach(o => o.el.classList.toggle('focused', o === w));
 }
 
 function openApp(id) {

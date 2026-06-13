@@ -12,14 +12,18 @@
     font-family:-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); overflow:hidden; }
   .bar { padding:11px 14px; border-bottom:1px solid var(--border); background:var(--panel);
     display:flex; flex-wrap:wrap; gap:9px; align-items:center; }
-  select, .bar input { padding:7px 10px; border-radius:8px; border:1px solid var(--border);
-    background:#0c0e13; color:var(--text); font-size:13px; }
-  select:focus, .bar input:focus { outline:none; border-color:var(--blue); }
+  select, .bar input { padding:7px 11px; border-radius:10px; border:1px solid rgba(0,0,0,.5);
+    background:#0a0c11; color:var(--text); font-size:13px; box-shadow: inset 0 2px 4px rgba(0,0,0,.45); }
+  select:focus, .bar input:focus { outline:none; border-color:var(--blue); box-shadow: inset 0 2px 4px rgba(0,0,0,.45), 0 0 0 3px rgba(91,141,239,.18); }
   .bar input { width:130px; }
   .bar label { font-size:11px; color:var(--muted); display:flex; flex-direction:column; gap:3px; }
-  button { background:var(--blue); color:#04122e; border:0; border-radius:8px; padding:8px 14px;
-    font-weight:600; cursor:pointer; font-size:13px; }
-  button.ghost { background:var(--panel2); color:var(--text); border:1px solid var(--border); font-weight:400; }
+  button { color:#04122e; border:0; border-radius:10px; padding:8px 15px; font-weight:700; cursor:pointer; font-size:13px;
+    background: linear-gradient(180deg,#7ba5f2,var(--blue));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 2px 6px rgba(0,0,0,.4); }
+  button:active { transform: translateY(1px); }
+  button.ghost { background:linear-gradient(180deg,var(--panel2),var(--panel)); color:var(--text);
+    border:1px solid rgba(255,255,255,.08); font-weight:500;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 2px 5px rgba(0,0,0,.3); }
   button:disabled { opacity:.4; cursor:default; }
   .tablewrap { flex:1; overflow:auto; }
   table { border-collapse:collapse; width:100%; font-size:12.5px; }
