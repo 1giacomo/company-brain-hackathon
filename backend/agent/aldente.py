@@ -74,14 +74,27 @@ def fetch_all(path: str, **filters: Any) -> list[dict[str, Any]]:
 
 def search_transcript(call_id: str, search: str, *, speaker: str | None = None,
                       limit: int = 12) -> dict[str, Any]:
-    """Pull only the segments matching `search` (and optional speaker). Never
-    download the full transcript (hundreds of segments = wasted tokens/efficiency)."""
+    """Pull only the segments matching `search` (and optional speaker). If the
+    search matches nothing, broaden once (drop the speaker filter, then return
+    the opening segments as context) rather than leaving the agent empty-handed —
+    still bounded, never the full transcript."""
     env = get(f"/calls/{call_id}/transcript", search=search, speaker=speaker, limit=limit)
-    return {
-        "call_id": call_id,
-        "matched_segments": env.get("segments", []),
-        "total_matches": env.get("pagination", {}).get("total", 0),
-    }
+    segs = env.get("segments", [])
+    total = env.get("pagination", {}).get("total", 0)
+    fallback = None
+    if not segs:
+        if speaker:  # retry without the speaker filter
+            env = get(f"/calls/{call_id}/transcript", search=search, limit=limit)
+            segs = env.get("segments", [])
+            total = env.get("pagination", {}).get("total", 0)
+        if not segs:  # still nothing → opening segments for context
+            ctx = get(f"/calls/{call_id}/transcript", limit=8)
+            segs = ctx.get("segments", [])
+            fallback = "no segments matched the search term; showing the opening segments"
+    out = {"call_id": call_id, "matched_segments": segs, "total_matches": total}
+    if fallback:
+        out["note"] = fallback
+    return out
 
 
 # --- "Last / most-recent" ordering -------------------------------------------

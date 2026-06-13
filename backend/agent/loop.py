@@ -58,6 +58,11 @@ not available and name what is missing. Do not estimate or derive it.
 - For "how many" / "total value" / grouped questions, ALWAYS use the tool's `aggregate` \
 parameter so the count/sum is computed over ALL rows in code — never list rows and count or add \
 them up yourself.
+- To find OR count calls about a specific defect/topic (e.g. 'foreign body', 'delivery delay', \
+'broken pasta'), you MUST set `text_contains` to that phrase. Counting calls without it returns \
+the TOTAL number of calls (e.g. 80), which is the wrong answer.
+- Read structured fields verbatim from the tool result — report `on_hand`, `min_stock` and the \
+`below_min` flag exactly as returned; never infer or compute whether something is below minimum.
 - For "last"/"most recent", use latest=true.
 - When a phone call and an official document disagree, the official document is authoritative.
 - Price-list (DOC-015) prices are PER CARTON (20 x 500g units), even though the table header \

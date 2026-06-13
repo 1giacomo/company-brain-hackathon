@@ -52,11 +52,23 @@ CASES = [
      ["9"], False, False),
     ("kb-12", "GranMercato S.p.A. (also written 'Gran Mercato S.p.A.') asked about the price of Fusilli n.98 (PAS-FUS-500). A call mentions one figure and the official 2026 wholesale price list mentions another. Which is the correct list price, and why?",
      ["8.07"], False, False),
-    # --- CRM stress probes (new) ---
+    # --- CRM stress probes ---
     ("crm-lc", "how many open opportunities does primato supermercati have",  # lowercase, no id/suffix
      ["4"], False, False),  # probe = does a lowercase/partial name resolve at all
     ("crm-trap2", "What is the order status for Pastifici Rossi Verdi S.p.A.?",  # invented customer
      [], True, False),
+    # --- ERP stress probes (weak vertical) ---
+    ("erp-lot", "What are the production status and quality status of lot LOT-2026-0405?",
+     ["blocked"], False, False),
+    ("erp-belowmin", "How many raw materials are currently below their minimum stock level?",
+     ["3"], False, False),
+    ("erp-chain2", "Which supplier provides raw material RAW-WHE-001, and is that material below minimum stock?",
+     ["durum wheat traders", "below"], False, False),
+    # --- Calls stress probes (weak vertical: find a call by topic, count by defect) ---
+    ("calls-fb", "Across all recorded calls, how many report a 'foreign body' complaint? Give the exact number.",
+     ["7"], False, False),
+    ("calls-topic", "How many calls concern a delivery delay? Give the exact number.",
+     ["7"], False, False),
 ]
 
 
