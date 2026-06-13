@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "ratel-assessment": {
+      "source": "ratel-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/ratel-assessment/SKILL.md",
+      "computedHash": "006f6fa11ba07162f2b576959b6ebdc107c14f8b03cfbf5219edb970f8bb4ef9"
+    },
+    "ratel-integrate": {
+      "source": "ratel-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/ratel-integrate/SKILL.md",
+      "computedHash": "0e82d4cdb6181a7ccfdd95bcf51ece4c5e74bbf50f7fa0a048d9593916d8c35e"
+    },
+    "ratel-langfuse-analyze": {
+      "source": "ratel-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/ratel-langfuse-analyze/SKILL.md",
+      "computedHash": "a7e7ae5f1a0e494675b39ae77139532a5d86259be0a514df80ded626a21e3251"
+    },
+    "ratel-langfuse-dashboards": {
+      "source": "ratel-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/ratel-langfuse-dashboards/SKILL.md",
+      "computedHash": "cfd207be24a308d0e6c2b2c913b0f1e1b00f0a5885d8e1ae8b92c84daa7bc82c"
+    },
+    "ratel-langfuse-instrument": {
+      "source": "ratel-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/ratel-langfuse-instrument/SKILL.md",
+      "computedHash": "0983ab8cfaac7347e2ddd4b4a7fc959608579e94a8f99624cc5615e6f1f68f6d"
+    }
+  }
+}
