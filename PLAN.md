@@ -8,7 +8,7 @@ pagination-correct aggregates and binary/inline artifacts.
 
 - `/ask` schema is frozen: `{answer, sources[], verticale, artifact_url}`, always HTTP 200, no streaming, <30s.
 - Provider: OpenAI-compatible (Regolo/Mistral). **Don't hardcode the model** — hit `GET {LLM_BASE_URL}/models`
-  at setup, confirm the id is live + tool-capable, and benchmark latency; pick the *fastest accurate*
+  at setup, confirm the id is live + tool-capable, and benchmark latency; pick the _fastest accurate_
   tool-calling model, not the biggest (latency budget below). Regolo ids are case-sensitive.
 - Efficiency is metered → targeted filtered calls, no bulk downloads, extract transcripts with `?search=`.
 - Arithmetic in code, never in the prompt. Whole-document KB retrieval.
@@ -21,7 +21,7 @@ pagination-correct aggregates and binary/inline artifacts.
 backend/
   main.py              # wire /ask -> agent.run(), cache, error fallback (HTTP 200)
   agent/
-    __init__.py
+    __init__.
     llm.py             # OpenAI client, chat wrapper, reasoning_content handling, retry/backoff
     aldente.py         # httpx client for mock APIs: auth, pagination, fetch_all, server-side aggregate
     tools.py           # tool JSON schemas + dispatch table; tracks sources used
@@ -52,7 +52,7 @@ backend/
 - **Cross-endpoint join (Q6 fix — `group_by` field may live on another endpoint):** `channel` is on
   `/crm/customers`, NOT on `/crm/opportunities`. The `enrich` step fetches `/crm/customers` **once**
   (paginate fully → `{customer_id: channel}` dict) and joins in Python before grouping. **Never** look
-  up each opportunity's customer individually (N+1, slow + metered). Record *both* sources used.
+  up each opportunity's customer individually (N+1, slow + metered). Record _both_ sources used.
 - Transcript helper: `search_transcript(call_id, term)` → `/calls/{id}/transcript?search=`,
   returns only matching segments (never full transcript).
 - **"Last/most-recent" ordering (Q3 fix):** never trust API default order. Fetch the rows, sort by the
@@ -93,7 +93,7 @@ model uses exact-match filters. Each call appends its source id to a per-request
   distinguishing tokens from the question (SKU regex `PAS-XXX-###`/`RAW-XXX-###`, plus `Bio`, `250g`,
   `500g`) and **exclude** non-matching variants from the candidate set before BM25. Only fall back to soft
   ranking when no distinguishing token is present. Return top 2–3 full docs.
-- **No embeddings** (dropped vs first draft): embeddings make near-identical spec sheets *more* confusable,
+- **No embeddings** (dropped vs first draft): embeddings make near-identical spec sheets _more_ confusable,
   add infra + sync time + latency, and BM25 + the hard filter already disambiguates. Skip chromadb/faiss.
 
 ## 6. Agent loop (`loop.py`)
@@ -101,7 +101,7 @@ model uses exact-match filters. Each call appends its source id to a per-request
 - System prompt: role, the 4 verticali, tool list, and the **honesty rules**:
     - verify a named entity exists (customer / SKU / lot — search first) before answering about it;
     - if not found, say so specifically ("no customer named X in the CRM");
-    - never invent figures absent from sources (e.g. profit margin → not available), even if it *looks*
+    - never invent figures absent from sources (e.g. profit margin → not available), even if it _looks_
       derivable — name exactly what's missing;
     - official documents beat call transcripts on conflicts (Q12);
     - respect a document's own unit convention — DOC-015 prices are **per carton (20×500g)** even though
@@ -112,7 +112,7 @@ model uses exact-match filters. Each call appends its source id to a per-request
   answer from what's gathered (the deadline is the real guard for slow multi-hop chains, see §0).
 - Collect `sources` from executed tools (the join in §3 records every endpoint touched).
 - **`verticale` (I4 fix):** the model emits its own `verticale` label in the final structured output
-  (it knows what the question is *fundamentally* about — Q5 is `calls`, Q12 is `kb`, even when both touch
+  (it knows what the question is _fundamentally_ about — Q5 is `calls`, Q12 is `kb`, even when both touch
   multiple sources). Use tool-usage tally only as a fallback/sanity check, not the primary signal.
 
 ## 7. Traps
