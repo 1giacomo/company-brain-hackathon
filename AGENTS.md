@@ -100,7 +100,7 @@ Some evaluation questions are **traps by design**: they ask about a customer tha
 Generation questions ask for a deliverable, in two flavors:
 
 - **HTML / markdown** (e.g. a 4-slide HTML deck): return it **inline in `answer`**. `artifact_url` stays null.
-- **Binary files - docx / pptx / pdf / xlsx** (a few hidden questions, explicit about the format): generate the file, save it under `backend/static/files/`, and return an **absolute** `artifact_url` like `f"{PUBLIC_BASE_URL}/files/report.pdf"`. This backend already serves `/files/` - no external storage. Libraries (`python-docx`, `python-pptx`, `fpdf2`, `openpyxl` for Excel) are commented in `pyproject.toml`.
+- **Binary files - docx / pptx / pdf / xlsx** (a few hidden questions, explicit about the format): generate the file, save it under `backend/static/files/`, and return an **absolute** `artifact_url` like `f"{PUBLIC_BASE_URL}/files/report.pdf"`. This backend already serves `/files/` - no external storage. Libraries (`python-docx`, `python-pptx`, `fpdf2`, `openpyxl` for Excel) are installed in `pyproject.toml` and wired in `agent/artifacts.py`.
 
 Either way, the content is judged first on **facts** (the real data must be in there) and on respecting the requested format; visual style is judged by humans later, on the top projects.
 
@@ -146,9 +146,11 @@ All read from `backend/.env` (copy `backend/.env.example`). On Railway, set them
 
 ## What is already set up
 
-- `POST /ask` route with the frozen schema (returns 501 until you implement it)
+> Historical scaffold note. These are now all implemented — see **Implementation (current state)** below.
+
+- `POST /ask` route with the frozen schema (~~returns 501 until you implement it~~ — implemented)
 - `/files/` static serving for binary artifacts + `PUBLIC_BASE_URL` pattern
-- Placeholder page at `GET /` (replace it with your working UI + knowledge graph)
+- ~~Placeholder page~~ at `GET /` (now the "Al Dente OS" UI + knowledge graph)
 - `railway.json` for a one-command deploy (no Dockerfile needed - Railpack)
 - Fallback Docker dev environment (`DOCKER.md`)
 - The KB documents in `backend/data/kb/`
@@ -161,6 +163,60 @@ All read from `backend/.env` (copy `backend/.env.example`). On Railway, set them
 - Artifact generation (inline HTML + binary files)
 - The UI + knowledge-graph visualization (required, graded at L2)
 - Prompts, caching, efficiency strategy
+
+## Implementation (current state)
+
+The challenge above is **built** (v1 agent → v2 OS UI → v3 performance). This section
+documents the actual codebase so you can work on it without re-deriving it.
+
+### Backend layout (`backend/`)
+
+- `main.py` — FastAPI app. `POST /ask` (frozen schema, implemented, always HTTP 200, in-memory
+  question cache), `GET /health`, `GET /` (the desktop UI), `GET /apps/{name}` (app windows),
+  `GET /kb/{doc_id}` (rendered doc), `GET /api/kb/list`, `GET /api/kb/doc/{id}` (raw markdown),
+  `GET /api/rag` (retrieval debug), `GET /api/explore/{table}` (read-only metered proxy over the
+  10 Al Dente tables), `GET /graph` (cached knowledge-graph nodes/edges), `/files/` static mount.
+- `agent/` — the agent package:
+  - `aldente.py` — Al Dente API client. `fetch_all` (pagination-aware), `aggregate`
+    (count/sum/group-by incl. the cross-endpoint channel join + `text_contains`), `latest_by`
+    (date sort), `search_customers` (exact variants → **cached fuzzy fallback**, trap-safe),
+    `search_transcript` (targeted + broaden-on-empty fallback). 7s HTTP timeout.
+  - `kb.py` — whole-document BM25 with a **hard variant filter** (SKU / Bio / 250g / 500g) that
+    disambiguates near-identical spec sheets; `search`, `search_debug`, `list_docs`.
+  - `llm.py` — OpenAI-compatible client; per-request timeout (default 12s) the caller derives
+    from its budget; `reasoning_content` fallback; bounded retries.
+  - `tools.py` — tool JSON schemas + dispatch + per-request source tracking (`Session`).
+  - `loop.py` — the tool-calling loop. **26s wall-clock budget** with per-call timeouts; round
+    cap 5; grounding/abstention/trap rules in the system prompt; `submit_answer`/`create_artifact`
+    meta-tools; narration guard; answer sanitization (strips leaked `<tool_call>` text and code
+    fences); `verticale` from the model with a tool-tally fallback.
+  - `artifacts.py` — inline HTML (in `answer`) vs binary docx/pptx/pdf/xlsx (to `static/files/`).
+  - `graph.py` — builds the knowledge-graph data once and caches it (metered traffic).
+- `eval_agent.py` — local eval harness: 12 sample questions + ERP/CRM/calls stress probes,
+  reports correct/wrong/abstain + latency p50/p95. Run before/after agent changes:
+  `cd backend && set -a && source .env && set +a && uv run python eval_agent.py`.
+
+### Frontend — "Al Dente OS" (`backend/static/`)
+
+`index.html` is a simulated desktop (dotted bg, dock, draggable/resizable windows, discomorphism
+disco-ball app icons). Apps in `static/apps/`: **brain** (chat over `/ask` + the "Fusilli" robot
+mascot — click it 3x for a rocket easter egg), **kb** (macOS Finder-style browser), **rag**
+(retrieval playground + the knowledge graph), **tables** (API table explorer), **preview** (macOS
+Preview-style doc viewer that the other apps open files in). Skeuomorphic styling; no build step.
+
+### Model
+
+`MODEL=qwen3.5-122b` (Regolo). Chosen by benchmarking: gpt-oss-120b is faster per call but its
+reasoning overhead made it slower end-to-end and less accurate on the eval harness (it leaks
+reasoning and abstains under the budget). Keep it env-configurable; re-A/B with the harness before
+switching.
+
+### Run / deploy
+
+- Local: `cd backend && uv run uvicorn main:app --reload` → http://localhost:8000
+- Deploy: Railway, `feat/agent-v3-performance` is the latest branch. Env lives in `backend/.env`
+  (gitignored) and as GitHub Actions secrets. See `DEPLOY.md`. Set `PUBLIC_BASE_URL` to the
+  Railway URL in production or artifact links break.
 
 ## Workflow and pacing (6 hours)
 
