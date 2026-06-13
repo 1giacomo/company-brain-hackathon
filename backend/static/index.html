@@ -26,9 +26,10 @@
   body {
     font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text);
     background:
-      radial-gradient(120% 90% at 28% -10%, #232a42 0%, transparent 55%),
-      radial-gradient(120% 90% at 100% 110%, #1d2335 0%, transparent 55%),
-      linear-gradient(160deg, #11141d 0%, var(--bg) 70%);
+      radial-gradient(110% 75% at 18% -12%, #4b2f8f 0%, transparent 50%),   /* violet glow */
+      radial-gradient(95% 70% at 108% 2%, #1f6bb0 0%, transparent 48%),     /* blue glow */
+      radial-gradient(120% 90% at 92% 118%, #0f6d5e 0%, transparent 52%),   /* teal glow */
+      linear-gradient(165deg, #181c2e 0%, var(--bg) 75%);
     user-select: none;
   }
   /* Dotted layer + film grain for material texture */
@@ -150,74 +151,41 @@
 
 <script>
 // ---- App registry --------------------------------------------------------
+// iOS-style app tiles: a vivid two-stop gradient + an iPhone emoji glyph,
+// in the spirit of the Spotify / YouTube / GitHub home-screen icons.
 const APPS = {
-  brain:  { title: "Company Brain", hue: 268, glyph: "brain",  w: 1040, h: 660 },
-  kb:     { title: "Knowledge Base", hue: 41,  glyph: "files", w: 900,  h: 600 },
-  rag:    { title: "RAG",            hue: 168, glyph: "search", w: 760,  h: 560 },
-  tables: { title: "API Tables",     hue: 212, glyph: "grid",   w: 1000, h: 600 },
+  brain:  { title: "Company Brain",  emoji: "🧠", c1: "#b15cff", c2: "#6d28d9", w: 1040, h: 660 },
+  kb:     { title: "Knowledge Base", emoji: "📚", c1: "#ffd24d", c2: "#ff8a00", w: 900,  h: 600 },
+  rag:    { title: "RAG",            emoji: "🔍", c1: "#2ee6a8", c2: "#0d9488", w: 760,  h: 560 },
+  tables: { title: "API Tables",     emoji: "🗂️", c1: "#5ea8ff", c2: "#2563eb", w: 1000, h: 600 },
 };
 const ICON_ORDER = ["brain", "kb", "rag", "tables"];
 
-// ---- Discomorphism icon generator (disco-ball sphere + glyph) ------------
-function discoIcon(hue, glyph) {
-  // Build a mosaic of facets with per-tile lightness jitter (deterministic).
-  const N = 9, R = 50, cx = 50, cy = 50;
-  let tiles = "";
-  let seed = hue * 7 + 13;
-  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-  const step = (2 * R) / N;
-  for (let i = 0; i < N; i++) {
-    for (let j = 0; j < N; j++) {
-      const x = cx - R + i * step, y = cy - R + j * step;
-      const dx = (x + step / 2 - cx), dy = (y + step / 2 - cy);
-      if (dx * dx + dy * dy > R * R) continue;            // clip to circle
-      const shade = 28 + rnd() * 34 - (dy / R) * 14;      // top brighter
-      const sat = 55 + rnd() * 20;
-      tiles += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${step.toFixed(1)}" height="${step.toFixed(1)}"
-        fill="hsl(${hue} ${sat.toFixed(0)}% ${shade.toFixed(0)}%)" opacity="0.92"/>`;
-    }
-  }
-  const glyphSvg = GLYPHS[glyph] || "";
+// ---- iOS-style app icon generator (squircle tile + gradient + gloss + emoji) ----
+function appIcon(meta, key) {
+  const id = (key || meta.title).replace(/\W/g, '');
   return `<svg class="art" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <radialGradient id="g${hue}" cx="38%" cy="32%" r="75%">
-        <stop offset="0%" stop-color="hsl(${hue} 70% 72%)"/>
-        <stop offset="45%" stop-color="hsl(${hue} 65% 46%)"/>
-        <stop offset="100%" stop-color="hsl(${hue} 70% 20%)"/>
-      </radialGradient>
-      <clipPath id="c${hue}"><circle cx="50" cy="50" r="50"/></clipPath>
-      <radialGradient id="s${hue}" cx="34%" cy="28%" r="40%">
-        <stop offset="0%" stop-color="#fff" stop-opacity="0.85"/>
-        <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
-      </radialGradient>
+      <linearGradient id="g_${id}" x1="0" y1="0" x2="0.35" y2="1">
+        <stop offset="0%" stop-color="${meta.c1}"/>
+        <stop offset="100%" stop-color="${meta.c2}"/>
+      </linearGradient>
+      <linearGradient id="gl_${id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#fff" stop-opacity="0.42"/>
+        <stop offset="48%" stop-color="#fff" stop-opacity="0"/>
+      </linearGradient>
+      <clipPath id="c_${id}"><rect x="4" y="4" width="92" height="92" rx="22"/></clipPath>
     </defs>
-    <g clip-path="url(#c${hue})">
-      <circle cx="50" cy="50" r="50" fill="url(#g${hue})"/>
-      <g style="mix-blend-mode:overlay">${tiles}</g>
-      <circle cx="50" cy="50" r="50" fill="url(#s${hue})"/>
-      <circle cx="50" cy="50" r="49" fill="none" stroke="hsl(${hue} 60% 12%)" stroke-width="2" opacity="0.6"/>
-      <g transform="translate(50,50)" fill="#0c0e13" opacity="0.92">${glyphSvg}</g>
+    <g clip-path="url(#c_${id})">
+      <rect x="4" y="4" width="92" height="92" fill="url(#g_${id})"/>
+      <rect x="4" y="4" width="92" height="44" fill="url(#gl_${id})"/>
+      <text x="50" y="55" text-anchor="middle" dominant-baseline="central" font-size="48"
+        font-family="'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif">${meta.emoji}</text>
     </g>
+    <rect x="4.5" y="4.5" width="91" height="91" rx="21.5" fill="none"
+      stroke="rgba(255,255,255,.35)" stroke-width="1"/>
   </svg>`;
 }
-const GLYPHS = {
-  // Spotify-style stacked arcs (Company Brain)
-  brain: `<path d="M-20 -8 A28 28 0 0 1 20 -8" stroke="#0c0e13" stroke-width="6" fill="none" stroke-linecap="round"/>
-          <path d="M-16 2 A22 22 0 0 1 16 2" stroke="#0c0e13" stroke-width="6" fill="none" stroke-linecap="round"/>
-          <path d="M-11 11 A15 15 0 0 1 11 11" stroke="#0c0e13" stroke-width="6" fill="none" stroke-linecap="round"/>`,
-  // Stacked documents
-  files: `<rect x="-16" y="-18" width="26" height="32" rx="2.5"/>
-          <rect x="-9" y="-12" width="26" height="32" rx="2.5" opacity="0.55"/>`,
-  // Magnifier over a doc
-  search: `<rect x="-20" y="-18" width="26" height="34" rx="2.5" opacity="0.55"/>
-           <circle cx="9" cy="6" r="11" fill="none" stroke="#0c0e13" stroke-width="5"/>
-           <line x1="17" y1="14" x2="24" y2="21" stroke="#0c0e13" stroke-width="5" stroke-linecap="round"/>`,
-  // Grid / table
-  grid: `<rect x="-19" y="-19" width="38" height="38" rx="3" fill="none" stroke="#0c0e13" stroke-width="4.5"/>
-         <line x1="-19" y1="-3" x2="19" y2="-3" stroke="#0c0e13" stroke-width="3.5"/>
-         <line x1="-19" y1="9" x2="19" y2="9" stroke="#0c0e13" stroke-width="3.5"/>
-         <line x1="-3" y1="-19" x2="-3" y2="19" stroke="#0c0e13" stroke-width="3.5"/>`,
-};
 
 // ---- Window manager ------------------------------------------------------
 const desktop = document.getElementById('desktop');
@@ -248,7 +216,7 @@ function openApp(id) {
   el.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px;z-index:${++zTop}`;
   el.innerHTML = `
     <div class="titlebar">
-      <span class="ti">${discoIcon(meta.hue, meta.glyph)}</span>
+      <span class="ti">${appIcon(meta, id)}</span>
       <span class="tt">${meta.title}</span>
       <span class="btns">
         <button class="tbtn min" title="Minimize"></button>
@@ -315,7 +283,7 @@ function renderDock() {
     const meta = APPS[id];
     const d = document.createElement('div');
     d.className = 'dock-item';
-    d.innerHTML = `<span class="live"></span>${discoIcon(meta.hue, meta.glyph)}<span>${meta.title}</span>`;
+    d.innerHTML = `<span class="live"></span>${appIcon(meta, id)}<span>${meta.title}</span>`;
     d.querySelector('.art').style.width = '18px';
     d.querySelector('.art').style.height = '18px';
     d.onclick = () => openApp(id);
@@ -329,7 +297,7 @@ ICON_ORDER.forEach(id => {
   const meta = APPS[id];
   const ic = document.createElement('div');
   ic.className = 'icon';
-  ic.innerHTML = `${discoIcon(meta.hue, meta.glyph)}<span class="label">${meta.title}</span>`;
+  ic.innerHTML = `${appIcon(meta, id)}<span class="label">${meta.title}</span>`;
   ic.ondblclick = () => openApp(id);
   let lastTap = 0;
   ic.onclick = () => { const t = Date.now(); if (t - lastTap < 400) openApp(id); lastTap = t; };
