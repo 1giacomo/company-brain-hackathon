@@ -396,18 +396,20 @@
       animation: blink 1.2s infinite;
     }
 
-    .bot-antenna {
+    /* Pupils dart around while thinking */
+    .bot-pupil {
       transform-box: fill-box;
       transform-origin: center;
-      animation: glow 2.2s ease-in-out infinite;
     }
 
-    #buddy.thinking .bot-antenna {
-      animation: ping .7s ease-in-out infinite;
+    #buddy.thinking .bot-pupil {
+      animation: look 1.1s ease-in-out infinite;
     }
 
-    .bot-chest {
-      animation: glow 2.2s ease-in-out infinite;
+    @keyframes look {
+      0%, 100% { transform: translate(0, 0); }
+      30% { transform: translate(2.4px, -1px); }
+      70% { transform: translate(-2.4px, 1px); }
     }
 
     @keyframes bob {
@@ -481,22 +483,31 @@
     <!-- Companion buddy -->
     <div id="buddy">
       <div class="bubble" id="bubble"></div>
-      <svg class="bot" id="bot" viewBox="0 0 88 96" xmlns="http://www.w3.org/2000/svg">
-        <line x1="44" y1="15" x2="44" y2="5" stroke="#c9a23a" stroke-width="3" stroke-linecap="round" />
-        <circle class="bot-antenna" cx="44" cy="5" r="4.6" fill="#ffd34d" />
-        <rect x="16" y="64" width="9" height="20" rx="4.5" fill="#cfc6b4" />
-        <rect x="63" y="64" width="9" height="20" rx="4.5" fill="#cfc6b4" />
-        <rect x="26" y="62" width="36" height="27" rx="10" fill="#dcd3c2" stroke="#bcb29a" stroke-width="1" />
-        <circle class="bot-chest" cx="44" cy="76" r="4" fill="#e0b341" />
-        <rect x="13" y="32" width="6" height="15" rx="3" fill="#cfc6b4" />
-        <rect x="69" y="32" width="6" height="15" rx="3" fill="#cfc6b4" />
-        <rect x="18" y="16" width="52" height="45" rx="15" fill="#f1ece0" stroke="#cdbf9e" stroke-width="1.5" />
-        <rect x="24" y="22" width="40" height="32" rx="11" fill="#15171f" />
-        <g class="bot-eyes" fill="#7fe7ff">
-          <circle cx="36" cy="37" r="4.6" />
-          <circle cx="52" cy="37" r="4.6" />
+      <svg class="bot" id="bot" viewBox="0 0 90 100" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="botBody" x1="0" y1="0" x2="1" y2="0.4">
+            <stop offset="0%" stop-color="#aab2bd" />
+            <stop offset="60%" stop-color="#929aa6" />
+            <stop offset="100%" stop-color="#7e8693" />
+          </linearGradient>
+        </defs>
+        <!-- neck / foot cylinder -->
+        <rect x="38" y="78" width="16" height="15" rx="4" fill="#8b93a0" stroke="#1b1d22" stroke-width="3" />
+        <ellipse cx="46" cy="78" rx="8" ry="2.6" fill="#aab2bd" stroke="#1b1d22" stroke-width="3" />
+        <!-- dome body -->
+        <path d="M16 84 L16 44 C16 15 74 15 74 44 L74 84 Z"
+          fill="url(#botBody)" stroke="#1b1d22" stroke-width="3.4" stroke-linejoin="round" />
+        <!-- subtle right-side shading -->
+        <path d="M62 22 C71 30 71 40 71 44 L71 82 L66 82 L66 30 Z" fill="#1b1d22" opacity="0.08" />
+        <!-- eyes -->
+        <g class="bot-eyes">
+          <circle cx="34" cy="48" r="9" fill="#f4f1e6" stroke="#1b1d22" stroke-width="3" />
+          <circle cx="56" cy="48" r="9" fill="#f4f1e6" stroke="#1b1d22" stroke-width="3" />
+          <circle class="bot-pupil" cx="34" cy="49" r="3.4" fill="#1b1d22" />
+          <circle class="bot-pupil" cx="56" cy="49" r="3.4" fill="#1b1d22" />
         </g>
-        <path d="M37 45 Q44 50 51 45" stroke="#7fe7ff" stroke-width="2.2" fill="none" stroke-linecap="round" />
+        <!-- smile -->
+        <path d="M33 64 Q45 75 57 64" fill="none" stroke="#1b1d22" stroke-width="3" stroke-linecap="round" />
       </svg>
     </div>
   </div>
