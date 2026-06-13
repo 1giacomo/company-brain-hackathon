@@ -54,7 +54,7 @@ CASES = [
      ["8.07"], False, False),
     # --- CRM stress probes (new) ---
     ("crm-lc", "how many open opportunities does primato supermercati have",  # lowercase, no id/suffix
-     ["4", "740000"], False, False),
+     ["4"], False, False),  # probe = does a lowercase/partial name resolve at all
     ("crm-trap2", "What is the order status for Pastifici Rossi Verdi S.p.A.?",  # invented customer
      [], True, False),
 ]

@@ -44,8 +44,12 @@ _AGG = {
 TOOL_SCHEMAS: list[dict[str, Any]] = [
     {"type": "function", "function": {
         "name": "crm_customers",
-        "description": "Search/list customers. Retries name spelling variants before reporting none. "
-                       "Use to verify a customer exists before answering about it.",
+        "description": "Search/list customers — ALWAYS start here for a CRM question to resolve the "
+                       "customer's id, then query opportunities/orders/invoices by that customer_id. "
+                       "Tolerates spelling/case/spacing (exact + fuzzy). Returns matched customers WITH "
+                       "their ids. If the result has match='fuzzy', confirm the company_name truly "
+                       "matches before answering. If total=0, the customer does NOT exist — say so; "
+                       "do not guess.",
         "parameters": {"type": "object", "properties": {
             "search": {"type": "string", "description": "Company name (full or partial)."},
             "channel": {"type": "string", "enum": ["GDO", "distributor", "horeca"]},
