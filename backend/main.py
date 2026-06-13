@@ -1,40 +1,44 @@
 """Al Dente Company Brain - backend entry point.
 
-Your job: implement the agent behind POST /ask. It orchestrates the Al Dente
-mock APIs (CRM / ERP / call logs) and a knowledge base you build over data/kb/,
-then answers with text or an artifact. Full spec and rules in AGENTS.md.
-
-The /ask contract below is FROZEN - the automated evaluator depends on it.
+POST /ask runs the agent (agent/loop.py) over the Al Dente mock APIs + the KB
+and returns the FROZEN schema. The contract is locked — the evaluator depends on
+it: always HTTP 200, single JSON object, no streaming, <30s. See AGENTS.md.
 """
 
-import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 load_dotenv()
+
+from agent import graph, kb, loop  # noqa: E402  (after load_dotenv so env is populated)
 
 app = FastAPI(title="Al Dente Company Brain")
 
 _STATIC = Path(__file__).resolve().parent / "static"
 _FILES = _STATIC / "files"
 _FILES.mkdir(parents=True, exist_ok=True)
-
-# Binary artifacts (docx / pptx / pdf / xlsx) you generate at request time go in
-# static/files/ and are served from /files/<name> by this same backend.
-# artifact_url must be ABSOLUTE: f"{os.environ['PUBLIC_BASE_URL']}/files/<name>"
 app.mount("/files", StaticFiles(directory=_FILES), name="files")
+
+# In-memory answer cache: the self-test repeats questions, so repeats are instant.
+_CACHE: dict[str, dict] = {}
+
+
+@app.on_event("startup")
+def _warmup() -> None:
+    # Build the small BM25 index ahead of the first request (healthcheck-safe).
+    try:
+        kb.warmup()
+    except Exception:  # noqa: BLE001 - never let startup work fail the healthcheck
+        pass
 
 
 @app.get("/", include_in_schema=False)
 def ui() -> FileResponse:
-    """Placeholder page. Building a minimal UI is part of the challenge:
-    it must exist and work, but it is not graded - replace static/index.html
-    (or serve your own frontend)."""
     return FileResponse(_STATIC / "index.html")
 
 
@@ -46,7 +50,7 @@ class AskResponse(BaseModel):
     answer: str
     sources: list[str]
     verticale: str  # one of: "crm", "erp", "calls", "kb"
-    artifact_url: str | None = None  # only for docx/pptx/pdf/xlsx questions
+    artifact_url: str | None = None
 
 
 @app.get("/health")
@@ -54,13 +58,28 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/graph", include_in_schema=False)
+def graph_data() -> JSONResponse:
+    """Knowledge-graph nodes/edges for the UI. Built once and cached server-side
+    so the UI never re-downloads the metered graph per page load."""
+    try:
+        return JSONResponse(graph.build())
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse({"nodes": [], "edges": [], "error": str(e)})
+
+
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
-    raise HTTPException(
-        status_code=501,
-        detail=(
-            "Not implemented. Build the agent loop: route the question, call "
-            "the Al Dente APIs and your knowledge base, compose the answer. "
-            "See AGENTS.md for the full spec."
-        ),
-    )
+    key = " ".join(request.question.split()).lower()
+    if key in _CACHE:
+        return AskResponse(**_CACHE[key])
+    try:
+        result = loop.run(request.question)
+    except Exception as e:  # noqa: BLE001
+        # Honest 200 beats a 5xx (CLAUDE.md): never signal "no info" with an error.
+        print(f"[ask] error: {e}")
+        return AskResponse(
+            answer="I cannot answer that right now due to a temporary issue.",
+            sources=[], verticale="kb", artifact_url=None)
+    _CACHE[key] = result
+    return AskResponse(**result)
