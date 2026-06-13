@@ -3,296 +3,301 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Al Dente · Company Brain</title>
-<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<title>Al Dente OS</title>
 <style>
   :root {
-    --bg: #0f1115; --panel: #181b22; --panel2: #1f232c; --border: #2a2f3a;
-    --text: #e8eaed; --muted: #9aa3b2; --accent: #e0b341; --accent2: #c0392b;
-    --green: #4caf7d;
+    --bg: #0c0e13; --bg2: #11141c; --dot: #232838;
+    --panel: #161a22; --panel2: #1d222c; --border: #2a3040;
+    --text: #e8eaed; --muted: #9aa3b2;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
-  header { padding: 14px 22px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 12px; background: var(--panel); }
-  header .logo { font-size: 22px; }
-  header h1 { font-size: 17px; margin: 0; font-weight: 600; letter-spacing: .3px; }
-  header .sub { color: var(--muted); font-size: 12.5px; }
-  .layout { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 53px); }
-  .col { display: flex; flex-direction: column; min-height: 0; position: relative; }
-  .col.left { border-right: 1px solid var(--border); }
-  .panel-title { padding: 10px 18px; font-size: 12px; text-transform: uppercase;
-    letter-spacing: 1px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text);
+    background:
+      radial-gradient(circle at 50% 0%, #1a1f2e 0%, var(--bg) 60%),
+      var(--bg);
+    user-select: none;
+  }
+  /* Dotted overlay */
+  #desktop {
+    position: fixed; inset: 0;
+    background-image: radial-gradient(var(--dot) 1.4px, transparent 1.4px);
+    background-size: 24px 24px; background-position: -12px -12px;
+  }
 
-  /* Chat */
-  #chat { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
-  .msg { max-width: 92%; padding: 11px 14px; border-radius: 12px; line-height: 1.5; font-size: 14px; }
-  .msg.user { align-self: flex-end; background: var(--accent); color: #1a1407; border-bottom-right-radius: 3px; }
-  .msg.bot { align-self: flex-start; background: var(--panel2); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
-  .msg.bot .answer { white-space: pre-wrap; }
-  /* Markdown rendering inside bot answers */
-  .msg.bot .answer.md { white-space: normal; }
-  .answer.md p { margin: 0 0 8px; }
-  .answer.md p:last-child { margin-bottom: 0; }
-  .answer.md ul, .answer.md ol { margin: 6px 0; padding-left: 20px; }
-  .answer.md li { margin: 2px 0; }
-  .answer.md h1, .answer.md h2, .answer.md h3 { margin: 10px 0 6px; font-size: 15px; }
-  .answer.md code { background: #0c0e13; padding: 1px 5px; border-radius: 4px;
-    font-family: ui-monospace, monospace; font-size: 12.5px; }
-  .answer.md pre { background: #0c0e13; padding: 10px; border-radius: 7px; overflow-x: auto; }
-  .answer.md pre code { padding: 0; }
-  .answer.md table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
-  .answer.md th, .answer.md td { border: 1px solid var(--border); padding: 4px 9px; text-align: left; }
-  .answer.md th { background: var(--panel); }
-  .answer.md a { color: var(--green); }
-  .answer.md strong { color: #fff; }
-  /* Markdown inside the gold user bubble: inherit dark text, subtle code bg */
-  .msg.user .answer.md { color: #1a1407; }
-  .msg.user .answer.md strong { color: #1a1407; }
-  .msg.user .answer.md code { background: rgba(0,0,0,.12); }
-  .msg.user .answer.md a { color: #5a3d00; }
-  .meta { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .chip { font-size: 11px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border);
-    background: #131620; color: var(--muted); }
-  .chip.vert { color: var(--accent); border-color: var(--accent); }
-  .chip.src { font-family: ui-monospace, monospace; }
-  a.chip.doc { color: var(--green); border-color: var(--green); cursor: pointer; text-decoration: none; }
-  a.chip.doc:hover { background: var(--green); color: #0c0e13; }
-  .artifact { margin-top: 9px; }
-  .artifact a { color: var(--green); font-weight: 600; }
-  .frame { margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background:#fff; }
-  .frame iframe { width: 100%; border: 0; height: 320px; display:block; }
-  .spinner { color: var(--muted); font-size: 13px; }
-  .examples { padding: 0 18px 12px; display: flex; flex-wrap: wrap; gap: 7px; }
-  .examples button { background: var(--panel2); color: var(--muted); border: 1px solid var(--border);
-    border-radius: 16px; padding: 5px 11px; font-size: 12px; cursor: pointer; }
-  .examples button:hover { color: var(--text); border-color: var(--accent); }
-  form { display: flex; gap: 9px; padding: 14px 18px; border-top: 1px solid var(--border); background: var(--panel); }
-  #q { flex: 1; padding: 11px 13px; border-radius: 9px; border: 1px solid var(--border);
-    background: #0c0e13; color: var(--text); font-size: 14px; }
-  #q:focus { outline: none; border-color: var(--accent); }
-  button.send { background: var(--accent); color: #1a1407; border: 0; border-radius: 9px;
-    padding: 0 18px; font-weight: 600; cursor: pointer; font-size: 14px; }
-  button.send:disabled { opacity: .5; cursor: default; }
+  /* Top menu bar */
+  #menubar {
+    position: fixed; top: 0; left: 0; right: 0; height: 32px; z-index: 9000;
+    display: flex; align-items: center; gap: 16px; padding: 0 16px;
+    background: rgba(18,21,28,.72); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  #menubar .brand { font-weight: 700; letter-spacing: .4px; }
+  #menubar .brand .pasta { margin-right: 7px; }
+  #menubar .spacer { flex: 1; }
+  #menubar .clock { color: var(--muted); font-variant-numeric: tabular-nums; }
 
-  /* Graph */
-  #graph { flex: 1; min-height: 0; }
-  .legend { padding: 9px 18px; display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px;
-    color: var(--muted); border-top: 1px solid var(--border); background: var(--panel); }
-  .legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  /* Desktop icons */
+  #icons { position: fixed; top: 52px; left: 26px; z-index: 10;
+    display: flex; flex-direction: column; gap: 26px; }
+  .icon { width: 96px; display: flex; flex-direction: column; align-items: center;
+    gap: 8px; cursor: pointer; border-radius: 12px; padding: 8px 4px; }
+  .icon:hover { background: rgba(255,255,255,.05); }
+  .icon .art { width: 66px; height: 66px; filter: drop-shadow(0 6px 14px rgba(0,0,0,.55));
+    transition: transform .15s ease; }
+  .icon:hover .art { transform: translateY(-3px) scale(1.05); }
+  .icon .label { font-size: 12.5px; text-align: center; line-height: 1.2;
+    text-shadow: 0 1px 3px rgba(0,0,0,.8); }
 
-  /* Document viewer overlay */
-  .doc-overlay { position: absolute; inset: 0; z-index: 5; background: var(--bg);
-    display: flex; flex-direction: column; }
-  .doc-overlay.hidden { display: none; }
-  .doc-bar { display: flex; align-items: center; justify-content: space-between;
-    padding: 9px 14px 9px 18px; background: var(--panel); border-bottom: 1px solid var(--border); }
-  .doc-bar .t { font: 13px ui-monospace, monospace; color: var(--accent); }
-  .doc-bar button { background: none; border: 1px solid var(--border); color: var(--muted);
-    width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1; }
-  .doc-bar button:hover { color: #fff; border-color: var(--accent2); background: var(--accent2); }
-  .doc-overlay iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+  /* Windows */
+  .window { position: fixed; min-width: 360px; min-height: 240px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.02) inset;
+    display: flex; flex-direction: column; overflow: hidden; }
+  .window.minimized { display: none; }
+  .titlebar { height: 38px; flex: none; display: flex; align-items: center; gap: 10px;
+    padding: 0 10px 0 13px; background: linear-gradient(var(--panel2), var(--panel));
+    border-bottom: 1px solid var(--border); cursor: grab; }
+  .titlebar.grabbing { cursor: grabbing; }
+  .titlebar .ti { width: 18px; height: 18px; flex: none; }
+  .titlebar .tt { font-size: 13px; font-weight: 600; flex: 1; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .titlebar .btns { display: flex; gap: 7px; }
+  .tbtn { width: 13px; height: 13px; border-radius: 50%; border: none; cursor: pointer;
+    padding: 0; position: relative; }
+  .tbtn.min { background: #f1c40f; } .tbtn.close { background: #e0533d; }
+  .tbtn:hover { filter: brightness(1.15); }
+  .window iframe { flex: 1; width: 100%; border: 0; background: var(--bg2); }
+  .resize { position: absolute; width: 16px; height: 16px; right: 0; bottom: 0;
+    cursor: nwse-resize; z-index: 2; }
+  .resize::after { content: ""; position: absolute; right: 3px; bottom: 3px;
+    width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); }
+
+  /* Dock */
+  #dock { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 9000; display: flex; gap: 10px; padding: 8px 12px; min-height: 18px;
+    background: rgba(22,26,34,.7); backdrop-filter: blur(14px);
+    border: 1px solid var(--border); border-radius: 16px; transition: opacity .2s; }
+  #dock:empty { opacity: 0; }
+  .dock-item { display: flex; align-items: center; gap: 7px; cursor: pointer;
+    background: rgba(255,255,255,.04); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 5px 11px 5px 7px; font-size: 12.5px; }
+  .dock-item:hover { background: rgba(255,255,255,.1); }
+  .dock-item img { width: 18px; height: 18px; }
+  .dock-item .live { width: 5px; height: 5px; border-radius: 50%; background: #4caf7d; }
 </style>
 </head>
 <body>
-<header>
-  <span class="logo">🍝</span>
-  <div>
-    <h1>Al Dente · Company Brain</h1>
-    <div class="sub">Ask about customers, production, calls and policies — answered from the live company data.</div>
-  </div>
-</header>
+<div id="desktop"></div>
 
-<div class="layout">
-  <!-- Left: chat -->
-  <div class="col left">
-    <div class="panel-title">Ask</div>
-    <div id="chat">
-      <div class="msg bot"><div class="answer">Ciao! Ask me anything about Al Dente — open opportunities, stock levels, call complaints, product specs, the price list. I'll cite my sources.</div></div>
-    </div>
-    <div class="examples" id="examples"></div>
-    <form id="form">
-      <input id="q" autocomplete="off" placeholder="e.g. How many open opportunities does Primato have?" />
-      <button class="send" id="send" type="submit">Ask</button>
-    </form>
-  </div>
-
-  <!-- Right: knowledge graph -->
-  <div class="col">
-    <div class="panel-title">Knowledge graph · customers ↔ products ↔ raw materials ↔ suppliers</div>
-    <div id="graph"></div>
-    <div class="legend">
-      <span><i class="dot" style="background:#e0b341"></i>Customer</span>
-      <span><i class="dot" style="background:#5b8def"></i>Channel</span>
-      <span><i class="dot" style="background:#4caf7d"></i>Product</span>
-      <span><i class="dot" style="background:#c98b3a"></i>Raw material</span>
-      <span><i class="dot" style="background:#c0392b"></i>Supplier</span>
-    </div>
-
-    <!-- Document viewer overlay (covers the graph when a source doc is opened) -->
-    <div id="docOverlay" class="doc-overlay hidden">
-      <div class="doc-bar">
-        <span class="t" id="docTitle">DOC</span>
-        <button id="docClose" title="Close">✕</button>
-      </div>
-      <iframe id="docFrame" title="Knowledge-base document"></iframe>
-    </div>
-  </div>
+<div id="menubar">
+  <span class="brand"><span class="pasta">🍝</span>Al Dente OS</span>
+  <span class="spacer"></span>
+  <span class="clock" id="clock"></span>
 </div>
 
+<div id="icons"></div>
+<div id="dock"></div>
+
 <script>
-const chat = document.getElementById('chat');
-const form = document.getElementById('form');
-const input = document.getElementById('q');
-const send = document.getElementById('send');
+// ---- App registry --------------------------------------------------------
+const APPS = {
+  brain:  { title: "Company Brain", hue: 268, glyph: "brain",  w: 1040, h: 660 },
+  kb:     { title: "Knowledge Base", hue: 41,  glyph: "files", w: 900,  h: 600 },
+  rag:    { title: "RAG",            hue: 168, glyph: "search", w: 760,  h: 560 },
+  tables: { title: "API Tables",     hue: 212, glyph: "grid",   w: 1000, h: 600 },
+};
+const ICON_ORDER = ["brain", "kb", "rag", "tables"];
 
-const EXAMPLES = [
-  "How many open opportunities does Primato Supermercati S.p.A. (CUST-0132) have, and their total value?",
-  "Is SKU PAS-PEN-500 below its minimum stock?",
-  "Total value of negotiation opportunities grouped by customer channel.",
-  "What is the shelf life and allergens for Spaghetti n.5 - 500g box (PAS-SPA-500)?",
-  "What is the profit margin on lot LOT-2026-0658?",
-];
-const ex = document.getElementById('examples');
-EXAMPLES.forEach(t => {
-  const b = document.createElement('button');
-  b.textContent = t.length > 52 ? t.slice(0, 50) + '…' : t;
-  b.onclick = () => { input.value = t; input.focus(); };
-  ex.appendChild(b);
-});
-
-function addUser(text) {
-  const d = document.createElement('div');
-  d.className = 'msg user';
-  const body = document.createElement('div');
-  body.className = 'answer md';
-  body.innerHTML = marked.parse(text, { breaks: true });
-  d.appendChild(body);
-  chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
-}
-function addBot() {
-  const d = document.createElement('div');
-  d.className = 'msg bot';
-  d.innerHTML = '<div class="spinner">Thinking…</div>';
-  chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
-  return d;
-}
-function looksLikeHtml(s) { return /<\/?(html|div|section|table|h[1-9]|ul|style|!doctype)/i.test(s); }
-
-function renderAnswer(el, data) {
-  const ans = data.answer || '';
-  let html = '';
-  if (looksLikeHtml(ans)) {
-    const srcdoc = ans.replace(/"/g, '&quot;');
-    html += `<div class="frame"><iframe sandbox="allow-same-origin" srcdoc="${srcdoc}"></iframe></div>`;
-  } else {
-    html += `<div class="answer md"></div>`;
-  }
-  html += `<div class="meta">`;
-  if (data.verticale) html += `<span class="chip vert">${data.verticale}</span>`;
-  (data.sources || []).forEach(s => {
-    if (/^DOC-\d{3}$/.test(s)) {
-      html += `<a class="chip src doc" href="/kb/${s}" data-doc="${s}" title="Open ${s}">📄 ${s}</a>`;
-    } else {
-      html += `<span class="chip src">${s}</span>`;
+// ---- Discomorphism icon generator (disco-ball sphere + glyph) ------------
+function discoIcon(hue, glyph) {
+  // Build a mosaic of facets with per-tile lightness jitter (deterministic).
+  const N = 9, R = 50, cx = 50, cy = 50;
+  let tiles = "";
+  let seed = hue * 7 + 13;
+  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  const step = (2 * R) / N;
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const x = cx - R + i * step, y = cy - R + j * step;
+      const dx = (x + step / 2 - cx), dy = (y + step / 2 - cy);
+      if (dx * dx + dy * dy > R * R) continue;            // clip to circle
+      const shade = 28 + rnd() * 34 - (dy / R) * 14;      // top brighter
+      const sat = 55 + rnd() * 20;
+      tiles += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${step.toFixed(1)}" height="${step.toFixed(1)}"
+        fill="hsl(${hue} ${sat.toFixed(0)}% ${shade.toFixed(0)}%)" opacity="0.92"/>`;
     }
+  }
+  const glyphSvg = GLYPHS[glyph] || "";
+  return `<svg class="art" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="g${hue}" cx="38%" cy="32%" r="75%">
+        <stop offset="0%" stop-color="hsl(${hue} 70% 72%)"/>
+        <stop offset="45%" stop-color="hsl(${hue} 65% 46%)"/>
+        <stop offset="100%" stop-color="hsl(${hue} 70% 20%)"/>
+      </radialGradient>
+      <clipPath id="c${hue}"><circle cx="50" cy="50" r="50"/></clipPath>
+      <radialGradient id="s${hue}" cx="34%" cy="28%" r="40%">
+        <stop offset="0%" stop-color="#fff" stop-opacity="0.85"/>
+        <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <g clip-path="url(#c${hue})">
+      <circle cx="50" cy="50" r="50" fill="url(#g${hue})"/>
+      <g style="mix-blend-mode:overlay">${tiles}</g>
+      <circle cx="50" cy="50" r="50" fill="url(#s${hue})"/>
+      <circle cx="50" cy="50" r="49" fill="none" stroke="hsl(${hue} 60% 12%)" stroke-width="2" opacity="0.6"/>
+      <g transform="translate(50,50)" fill="#0c0e13" opacity="0.92">${glyphSvg}</g>
+    </g>
+  </svg>`;
+}
+const GLYPHS = {
+  // Spotify-style stacked arcs (Company Brain)
+  brain: `<path d="M-20 -8 A28 28 0 0 1 20 -8" stroke="#0c0e13" stroke-width="6" fill="none" stroke-linecap="round"/>
+          <path d="M-16 2 A22 22 0 0 1 16 2" stroke="#0c0e13" stroke-width="6" fill="none" stroke-linecap="round"/>
+          <path d="M-11 11 A15 15 0 0 1 11 11" stroke="#0c0e13" stroke-width="6" fill="none" stroke-linecap="round"/>`,
+  // Stacked documents
+  files: `<rect x="-16" y="-18" width="26" height="32" rx="2.5"/>
+          <rect x="-9" y="-12" width="26" height="32" rx="2.5" opacity="0.55"/>`,
+  // Magnifier over a doc
+  search: `<rect x="-20" y="-18" width="26" height="34" rx="2.5" opacity="0.55"/>
+           <circle cx="9" cy="6" r="11" fill="none" stroke="#0c0e13" stroke-width="5"/>
+           <line x1="17" y1="14" x2="24" y2="21" stroke="#0c0e13" stroke-width="5" stroke-linecap="round"/>`,
+  // Grid / table
+  grid: `<rect x="-19" y="-19" width="38" height="38" rx="3" fill="none" stroke="#0c0e13" stroke-width="4.5"/>
+         <line x1="-19" y1="-3" x2="19" y2="-3" stroke="#0c0e13" stroke-width="3.5"/>
+         <line x1="-19" y1="9" x2="19" y2="9" stroke="#0c0e13" stroke-width="3.5"/>
+         <line x1="-3" y1="-19" x2="-3" y2="19" stroke="#0c0e13" stroke-width="3.5"/>`,
+};
+
+// ---- Window manager ------------------------------------------------------
+const desktop = document.getElementById('desktop');
+const dock = document.getElementById('dock');
+let zTop = 100, openWins = {}, cascade = 0;
+
+function focusWin(id) {
+  const w = openWins[id]; if (!w) return;
+  w.el.style.zIndex = ++zTop;
+}
+
+function openApp(id) {
+  const meta = APPS[id];
+  if (openWins[id]) {                       // already open → restore + focus
+    openWins[id].el.classList.remove('minimized');
+    focusWin(id);
+    return;
+  }
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const w = Math.min(meta.w, vw - 60), h = Math.min(meta.h, vh - 110);
+  const left = Math.max(120, (vw - w) / 2 + (cascade % 5) * 28 - 56);
+  const top = Math.max(44, (vh - h) / 2 + (cascade % 5) * 24 - 48);
+  cascade++;
+
+  const el = document.createElement('div');
+  el.className = 'window';
+  el.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px;z-index:${++zTop}`;
+  el.innerHTML = `
+    <div class="titlebar">
+      <span class="ti">${discoIcon(meta.hue, meta.glyph)}</span>
+      <span class="tt">${meta.title}</span>
+      <span class="btns">
+        <button class="tbtn min" title="Minimize"></button>
+        <button class="tbtn close" title="Close"></button>
+      </span>
+    </div>
+    <iframe src="/apps/${id}" title="${meta.title}"></iframe>
+    <div class="resize"></div>`;
+  // titlebar art sizing
+  el.querySelector('.ti .art').style.width = '18px';
+  el.querySelector('.ti .art').style.height = '18px';
+  desktop.appendChild(el);
+  openWins[id] = { el };
+
+  el.addEventListener('mousedown', () => focusWin(id), true);
+  el.querySelector('.tbtn.close').onclick = () => closeApp(id);
+  el.querySelector('.tbtn.min').onclick = () => { el.classList.add('minimized'); };
+  makeDraggable(id, el, el.querySelector('.titlebar'));
+  makeResizable(el, el.querySelector('.resize'));
+  renderDock();
+}
+
+function closeApp(id) {
+  const w = openWins[id]; if (!w) return;
+  w.el.remove(); delete openWins[id]; renderDock();
+}
+
+function makeDraggable(id, el, handle) {
+  let sx, sy, ox, oy, dragging = false;
+  handle.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.tbtn')) return;
+    dragging = true; handle.classList.add('grabbing');
+    sx = e.clientX; sy = e.clientY;
+    ox = el.offsetLeft; oy = el.offsetTop; focusWin(id);
+    e.preventDefault();
   });
-  html += `</div>`;
-  if (data.artifact_url) {
-    html += `<div class="artifact">📎 <a href="${data.artifact_url}" target="_blank" rel="noopener">Download artifact</a></div>`;
-  }
-  el.innerHTML = html;
-  if (!looksLikeHtml(ans)) {
-    const target = el.querySelector('.answer');
-    target.innerHTML = marked.parse(ans, { breaks: true });
-  }
-  chat.scrollTop = chat.scrollHeight;
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    let nl = ox + e.clientX - sx, nt = oy + e.clientY - sy;
+    nl = Math.max(-el.offsetWidth + 90, Math.min(nl, window.innerWidth - 60));
+    nt = Math.max(32, Math.min(nt, window.innerHeight - 44));
+    el.style.left = nl + 'px'; el.style.top = nt + 'px';
+  });
+  window.addEventListener('mouseup', () => { dragging = false; handle.classList.remove('grabbing'); });
 }
 
-form.onsubmit = async (e) => {
-  e.preventDefault();
-  const question = input.value.trim();
-  if (!question) return;
-  addUser(question);
-  input.value = ''; send.disabled = true;
-  const bot = addBot();
-  try {
-    const res = await fetch('/ask', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question }),
-    });
-    const data = await res.json();
-    renderAnswer(bot, data);
-  } catch (err) {
-    bot.innerHTML = `<div class="answer">Network error: ${err}</div>`;
-  } finally {
-    send.disabled = false; input.focus();
-  }
-};
+function makeResizable(el, grip) {
+  let sx, sy, ow, oh, resizing = false;
+  grip.addEventListener('mousedown', (e) => {
+    resizing = true; sx = e.clientX; sy = e.clientY;
+    ow = el.offsetWidth; oh = el.offsetHeight; e.preventDefault(); e.stopPropagation();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!resizing) return;
+    el.style.width = Math.max(360, ow + e.clientX - sx) + 'px';
+    el.style.height = Math.max(240, oh + e.clientY - sy) + 'px';
+  });
+  window.addEventListener('mouseup', () => { resizing = false; });
+}
 
-// Document viewer overlay (load source docs over the graph, closable)
-const docOverlay = document.getElementById('docOverlay');
-const docFrame = document.getElementById('docFrame');
-const docTitle = document.getElementById('docTitle');
-function openDoc(id) {
-  docTitle.textContent = '📄 ' + id;
-  docFrame.src = '/kb/' + id;
-  docOverlay.classList.remove('hidden');
+function renderDock() {
+  dock.innerHTML = '';
+  Object.keys(openWins).forEach(id => {
+    const meta = APPS[id];
+    const d = document.createElement('div');
+    d.className = 'dock-item';
+    d.innerHTML = `<span class="live"></span>${discoIcon(meta.hue, meta.glyph)}<span>${meta.title}</span>`;
+    d.querySelector('.art').style.width = '18px';
+    d.querySelector('.art').style.height = '18px';
+    d.onclick = () => openApp(id);
+    dock.appendChild(d);
+  });
 }
-function closeDoc() {
-  docOverlay.classList.add('hidden');
-  docFrame.src = 'about:blank';
-}
-document.getElementById('docClose').onclick = closeDoc;
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDoc(); });
-// Delegated: intercept clicks on document source chips.
-chat.addEventListener('click', (e) => {
-  const link = e.target.closest('a.chip.doc');
-  if (!link) return;
-  e.preventDefault();
-  openDoc(link.dataset.doc);
+
+// ---- Desktop icons -------------------------------------------------------
+const iconsEl = document.getElementById('icons');
+ICON_ORDER.forEach(id => {
+  const meta = APPS[id];
+  const ic = document.createElement('div');
+  ic.className = 'icon';
+  ic.innerHTML = `${discoIcon(meta.hue, meta.glyph)}<span class="label">${meta.title}</span>`;
+  ic.ondblclick = () => openApp(id);
+  let lastTap = 0;
+  ic.onclick = () => { const t = Date.now(); if (t - lastTap < 400) openApp(id); lastTap = t; };
+  iconsEl.appendChild(ic);
 });
 
-// Knowledge graph
-const GROUP_COLORS = {
-  customer: '#e0b341', channel: '#5b8def', product: '#4caf7d',
-  raw_material: '#c98b3a', supplier: '#c0392b',
-};
-async function loadGraph() {
-  try {
-    const res = await fetch('/graph');
-    const g = await res.json();
-    if (!g.nodes || !g.nodes.length) {
-      document.getElementById('graph').innerHTML =
-        '<p style="color:#9aa3b2;padding:20px">Graph unavailable.</p>';
-      return;
-    }
-    const nodes = g.nodes.map(n => ({
-      id: n.id, label: n.label, group: n.group,
-      color: GROUP_COLORS[n.group] || '#777',
-      shape: n.group === 'channel' ? 'diamond' : (n.group === 'supplier' ? 'square' : 'dot'),
-      value: n.group === 'channel' ? 30 : 12,
-      font: { color: '#e8eaed', size: 12 },
-    }));
-    const edges = g.edges.map(e => ({
-      from: e.from, to: e.to, arrows: 'to',
-      color: { color: '#3a4150', opacity: 0.6 }, width: 0.7,
-    }));
-    new vis.Network(document.getElementById('graph'),
-      { nodes, edges }, {
-        physics: { stabilization: true, barnesHut: { gravitationalConstant: -8000, springLength: 110 } },
-        interaction: { hover: true, tooltipDelay: 120 },
-        nodes: { borderWidth: 0, scaling: { min: 8, max: 34 } },
-      });
-  } catch (err) {
-    document.getElementById('graph').innerHTML =
-      `<p style="color:#9aa3b2;padding:20px">Graph error: ${err}</p>`;
-  }
+// ---- Clock ---------------------------------------------------------------
+function tick() {
+  const d = new Date();
+  document.getElementById('clock').textContent =
+    d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + '  ' +
+    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-loadGraph();
+tick(); setInterval(tick, 10000);
+
+// Open Company Brain by default so the page is alive on first load.
+openApp('brain');
 </script>
 </body>
 </html>
