@@ -151,41 +151,123 @@
 
 <script>
 // ---- App registry --------------------------------------------------------
-// iOS-style app tiles: a vivid two-stop gradient + an iPhone emoji glyph,
-// in the spirit of the Spotify / YouTube / GitHub home-screen icons.
+// Discomorphism: each app icon is a 3D mirror-ball / disco-tile object sitting
+// on a squircle tile (see the YouTube/Notion reference). `shape` + `hue`/`sat`
+// pick the object; `t1`/`t2` are the tile background.
 const APPS = {
-  brain:   { title: "Company Brain",  emoji: "🧠", c1: "#b15cff", c2: "#6d28d9", w: 1040, h: 660 },
-  kb:      { title: "Knowledge Base", emoji: "📚", c1: "#ffd24d", c2: "#ff8a00", w: 900,  h: 600 },
-  rag:     { title: "RAG",            emoji: "🔍", c1: "#2ee6a8", c2: "#0d9488", w: 760,  h: 560 },
-  tables:  { title: "API Tables",     emoji: "🗂️", c1: "#5ea8ff", c2: "#2563eb", w: 1000, h: 600 },
+  brain:   { title: "Company Brain",  shape: "sphere",    hue: 270, sat: 65, t1: "#6a34e0", t2: "#3a1a9c", w: 1040, h: 660 },
+  kb:      { title: "Knowledge Base", shape: "cube",      hue: 42,  sat: 80, t1: "#f3f4f7", t2: "#dde1e9", light: true, w: 900,  h: 600 },
+  rag:     { title: "RAG",            shape: "magnifier", hue: 0,   sat: 0,  t1: "#ef6f2f", t2: "#cf451a", w: 760,  h: 560 },
+  tables:  { title: "API Tables",     shape: "card",      hue: 222, sat: 70, t1: "#3f6ef0", t2: "#2447cf", w: 1000, h: 600 },
   // Utility app — launched on demand to view a file (like macOS Preview), no desktop icon.
-  preview: { title: "Preview",        emoji: "🖼️", c1: "#cfd6e2", c2: "#8a93a6", w: 820,  h: 680 },
+  preview: { title: "Preview",        shape: "sphere",    hue: 205, sat: 18, t1: "#eef1f5", t2: "#d6dbe4", light: true, w: 820,  h: 680 },
 };
 const ICON_ORDER = ["brain", "kb", "rag", "tables"];
 
-// ---- iOS-style app icon generator (squircle tile + gradient + gloss + emoji) ----
+// ---- Discomorphism icon generator ---------------------------------------
+let _uid = 0;
+
+// A grid of little mirror tiles over a box, with per-tile lightness jitter
+// (deterministic per seed). The caller clips it to a shape.
+function discoTiles(x, y, w, h, cell, hue, sat, base, jit, seed) {
+  let s = seed; const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  let o = "";
+  for (let yy = y; yy < y + h; yy += cell)
+    for (let xx = x; xx < x + w; xx += cell) {
+      const l = Math.max(10, Math.min(95, base + (rnd() * 2 - 1) * jit));
+      o += `<rect x="${xx.toFixed(1)}" y="${yy.toFixed(1)}" width="${(cell - .55).toFixed(1)}" height="${(cell - .55).toFixed(1)}" rx="0.5" fill="hsl(${hue} ${sat}% ${l.toFixed(0)}%)"/>`;
+    }
+  return o;
+}
+function sparkles(list) {
+  return list.map(([x, y, r]) =>
+    `<circle cx="${x}" cy="${y}" r="${r * 2.4}" fill="#fff" opacity="0.25"/><circle cx="${x}" cy="${y}" r="${r}" fill="#fff"/>`).join('');
+}
+const _poly = pts => pts.map(p => p.join(',')).join(' ');
+
+function discoShape(shape, u, hue, sat) {
+  const seed = u * 131 + 7;
+  const shadow = `<ellipse cx="50" cy="81" rx="22" ry="4.5" fill="#000" opacity="0.26"/>`;
+  if (shape === "sphere") {
+    const cx = 50, cy = 47, r = 27;
+    return `${shadow}
+      <clipPath id="s${u}"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath>
+      <radialGradient id="sh${u}" cx="36%" cy="30%" r="72%">
+        <stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="34%" stop-color="#fff" stop-opacity="0"/></radialGradient>
+      <radialGradient id="sd${u}" cx="68%" cy="76%" r="62%">
+        <stop offset="0%" stop-color="hsl(${hue} ${sat}% 8%)" stop-opacity="0.75"/><stop offset="62%" stop-color="#000" stop-opacity="0"/></radialGradient>
+      <g clip-path="url(#s${u})">
+        ${discoTiles(cx - r, cy - r, 2 * r, 2 * r, 4.3, hue, sat, 54, 30, seed)}
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#sd${u})"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#sh${u})"/>
+      </g>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="1"/>
+      ${sparkles([[40, 35, 1.7], [57, 41, 1.2], [45, 52, 1]])}`;
+  }
+  if (shape === "cube") {
+    const top = [[50, 24], [73, 37], [50, 50], [27, 37]];
+    const left = [[27, 37], [50, 50], [50, 74], [27, 61]];
+    const right = [[73, 37], [50, 50], [50, 74], [73, 61]];
+    return `${shadow}
+      <clipPath id="ct${u}"><polygon points="${_poly(top)}"/></clipPath>
+      <clipPath id="cl${u}"><polygon points="${_poly(left)}"/></clipPath>
+      <clipPath id="cr${u}"><polygon points="${_poly(right)}"/></clipPath>
+      <g clip-path="url(#ct${u})">${discoTiles(27, 24, 46, 27, 3.9, hue, sat, 68, 20, seed)}</g>
+      <g clip-path="url(#cl${u})">${discoTiles(27, 37, 24, 38, 3.9, hue, sat, 48, 18, seed + 4)}</g>
+      <g clip-path="url(#cr${u})">${discoTiles(50, 37, 24, 38, 3.9, hue, sat, 34, 16, seed + 9)}</g>
+      <polygon points="${_poly(top)}" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="0.7"/>
+      <line x1="50" y1="50" x2="50" y2="74" stroke="rgba(0,0,0,.25)" stroke-width="0.7"/>
+      ${sparkles([[45, 32, 1.5], [60, 44, 1.1], [36, 50, 1]])}`;
+  }
+  if (shape === "magnifier") {
+    const cx = 45, cy = 42, R = 17;
+    return `${shadow}
+      <clipPath id="mc${u}"><circle cx="${cx}" cy="${cy}" r="${R}"/></clipPath>
+      <mask id="mm${u}"><circle cx="${cx}" cy="${cy}" r="${R}" fill="#fff"/><circle cx="${cx}" cy="${cy}" r="8.5" fill="#000"/></mask>
+      <linearGradient id="hg${u}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#f2f2f2"/><stop offset="50%" stop-color="#9aa0aa"/><stop offset="100%" stop-color="#e6e8ec"/></linearGradient>
+      <rect x="55.5" y="54" width="8" height="24" rx="4" fill="url(#hg${u})" transform="rotate(45 59.5 66)"
+        stroke="rgba(0,0,0,.2)" stroke-width="0.6"/>
+      <g clip-path="url(#mc${u})" mask="url(#mm${u})">
+        ${discoTiles(cx - R, cy - R, 2 * R, 2 * R, 3.6, hue, sat, 62, 30, seed)}
+      </g>
+      <circle cx="${cx}" cy="${cy}" r="8.5" fill="#bfe0ff" opacity="0.22"/>
+      <path d="M${cx - 5} ${cy - 4} A8.5 8.5 0 0 1 ${cx + 4} ${cy - 6}" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/>
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1"/>
+      ${sparkles([[38, 35, 1.5], [52, 38, 1.1]])}`;
+  }
+  // card — a tilted mirror tablet (API Tables)
+  const card = [[30, 34], [70, 28], [74, 60], [34, 66]];
+  return `${shadow}
+    <clipPath id="cp${u}"><polygon points="${_poly(card)}"/></clipPath>
+    <linearGradient id="cs${u}" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.4"/><stop offset="45%" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <g clip-path="url(#cp${u})">
+      ${discoTiles(28, 26, 48, 42, 3.8, hue, sat, 56, 28, seed)}
+      <polygon points="${_poly(card)}" fill="url(#cs${u})"/>
+    </g>
+    <polygon points="${_poly(card)}" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="0.8"/>
+    ${sparkles([[42, 36, 1.6], [60, 38, 1.2], [50, 54, 1]])}`;
+}
+
 function appIcon(meta, key) {
-  const id = (key || meta.title).replace(/\W/g, '');
+  const u = ++_uid;
+  const onLight = !!meta.light;  // light tiles get a darker rim
   return `<svg class="art" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <linearGradient id="g_${id}" x1="0" y1="0" x2="0.35" y2="1">
-        <stop offset="0%" stop-color="${meta.c1}"/>
-        <stop offset="100%" stop-color="${meta.c2}"/>
-      </linearGradient>
-      <linearGradient id="gl_${id}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#fff" stop-opacity="0.42"/>
-        <stop offset="48%" stop-color="#fff" stop-opacity="0"/>
-      </linearGradient>
-      <clipPath id="c_${id}"><rect x="4" y="4" width="92" height="92" rx="22"/></clipPath>
+      <linearGradient id="tg${u}" x1="0" y1="0" x2="0.4" y2="1">
+        <stop offset="0%" stop-color="${meta.t1}"/><stop offset="100%" stop-color="${meta.t2}"/></linearGradient>
+      <linearGradient id="tl${u}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#fff" stop-opacity="0.4"/><stop offset="46%" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      <clipPath id="tc${u}"><rect x="4" y="4" width="92" height="92" rx="22"/></clipPath>
     </defs>
-    <g clip-path="url(#c_${id})">
-      <rect x="4" y="4" width="92" height="92" fill="url(#g_${id})"/>
-      <rect x="4" y="4" width="92" height="44" fill="url(#gl_${id})"/>
-      <text x="50" y="55" text-anchor="middle" dominant-baseline="central" font-size="48"
-        font-family="'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif">${meta.emoji}</text>
+    <g clip-path="url(#tc${u})">
+      <rect x="4" y="4" width="92" height="92" fill="url(#tg${u})"/>
+      <rect x="4" y="4" width="92" height="44" fill="url(#tl${u})"/>
+      ${discoShape(meta.shape, u, meta.hue, meta.sat)}
     </g>
     <rect x="4.5" y="4.5" width="91" height="91" rx="21.5" fill="none"
-      stroke="rgba(255,255,255,.35)" stroke-width="1"/>
+      stroke="${onLight ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.32)'}" stroke-width="1"/>
   </svg>`;
 }
 
