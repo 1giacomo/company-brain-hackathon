@@ -1,28 +1,298 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Al Dente - Company Brain</title>
-  <style>
-    body { margin:0; background:#14120B; color:#ece8dd; display:grid; min-height:100vh;
-      place-items:center; font:16px/1.6 ui-sans-serif, system-ui, sans-serif; }
-    main { max-width:560px; padding:24px; }
-    h1 { font-size:22px; margin:0 0 4px; }
-    .tag { font:11px/1 ui-monospace, monospace; letter-spacing:.18em; text-transform:uppercase; color:#F54E00; }
-    p { color:#9b9684; }
-    code { color:#ece8dd; background:#1c1a12; border:1px solid #2e2b20; border-radius:5px; padding:2px 6px; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Al Dente · Company Brain</title>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --panel2: #1f232c; --border: #2a2f3a;
+    --text: #e8eaed; --muted: #9aa3b2; --accent: #e0b341; --accent2: #c0392b;
+    --green: #4caf7d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+  header { padding: 14px 22px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; background: var(--panel); }
+  header .logo { font-size: 22px; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; letter-spacing: .3px; }
+  header .sub { color: var(--muted); font-size: 12.5px; }
+  .layout { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 53px); }
+  .col { display: flex; flex-direction: column; min-height: 0; position: relative; }
+  .col.left { border-right: 1px solid var(--border); }
+  .panel-title { padding: 10px 18px; font-size: 12px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); border-bottom: 1px solid var(--border); }
+
+  /* Chat */
+  #chat { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 92%; padding: 11px 14px; border-radius: 12px; line-height: 1.5; font-size: 14px; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: #1a1407; border-bottom-right-radius: 3px; }
+  .msg.bot { align-self: flex-start; background: var(--panel2); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
+  .msg.bot .answer { white-space: pre-wrap; }
+  /* Markdown rendering inside bot answers */
+  .msg.bot .answer.md { white-space: normal; }
+  .answer.md p { margin: 0 0 8px; }
+  .answer.md p:last-child { margin-bottom: 0; }
+  .answer.md ul, .answer.md ol { margin: 6px 0; padding-left: 20px; }
+  .answer.md li { margin: 2px 0; }
+  .answer.md h1, .answer.md h2, .answer.md h3 { margin: 10px 0 6px; font-size: 15px; }
+  .answer.md code { background: #0c0e13; padding: 1px 5px; border-radius: 4px;
+    font-family: ui-monospace, monospace; font-size: 12.5px; }
+  .answer.md pre { background: #0c0e13; padding: 10px; border-radius: 7px; overflow-x: auto; }
+  .answer.md pre code { padding: 0; }
+  .answer.md table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+  .answer.md th, .answer.md td { border: 1px solid var(--border); padding: 4px 9px; text-align: left; }
+  .answer.md th { background: var(--panel); }
+  .answer.md a { color: var(--green); }
+  .answer.md strong { color: #fff; }
+  /* Markdown inside the gold user bubble: inherit dark text, subtle code bg */
+  .msg.user .answer.md { color: #1a1407; }
+  .msg.user .answer.md strong { color: #1a1407; }
+  .msg.user .answer.md code { background: rgba(0,0,0,.12); }
+  .msg.user .answer.md a { color: #5a3d00; }
+  .meta { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip { font-size: 11px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border);
+    background: #131620; color: var(--muted); }
+  .chip.vert { color: var(--accent); border-color: var(--accent); }
+  .chip.src { font-family: ui-monospace, monospace; }
+  a.chip.doc { color: var(--green); border-color: var(--green); cursor: pointer; text-decoration: none; }
+  a.chip.doc:hover { background: var(--green); color: #0c0e13; }
+  .artifact { margin-top: 9px; }
+  .artifact a { color: var(--green); font-weight: 600; }
+  .frame { margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background:#fff; }
+  .frame iframe { width: 100%; border: 0; height: 320px; display:block; }
+  .spinner { color: var(--muted); font-size: 13px; }
+  .examples { padding: 0 18px 12px; display: flex; flex-wrap: wrap; gap: 7px; }
+  .examples button { background: var(--panel2); color: var(--muted); border: 1px solid var(--border);
+    border-radius: 16px; padding: 5px 11px; font-size: 12px; cursor: pointer; }
+  .examples button:hover { color: var(--text); border-color: var(--accent); }
+  form { display: flex; gap: 9px; padding: 14px 18px; border-top: 1px solid var(--border); background: var(--panel); }
+  #q { flex: 1; padding: 11px 13px; border-radius: 9px; border: 1px solid var(--border);
+    background: #0c0e13; color: var(--text); font-size: 14px; }
+  #q:focus { outline: none; border-color: var(--accent); }
+  button.send { background: var(--accent); color: #1a1407; border: 0; border-radius: 9px;
+    padding: 0 18px; font-weight: 600; cursor: pointer; font-size: 14px; }
+  button.send:disabled { opacity: .5; cursor: default; }
+
+  /* Graph */
+  #graph { flex: 1; min-height: 0; }
+  .legend { padding: 9px 18px; display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px;
+    color: var(--muted); border-top: 1px solid var(--border); background: var(--panel); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+
+  /* Document viewer overlay */
+  .doc-overlay { position: absolute; inset: 0; z-index: 5; background: var(--bg);
+    display: flex; flex-direction: column; }
+  .doc-overlay.hidden { display: none; }
+  .doc-bar { display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 14px 9px 18px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  .doc-bar .t { font: 13px ui-monospace, monospace; color: var(--accent); }
+  .doc-bar button { background: none; border: 1px solid var(--border); color: var(--muted);
+    width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1; }
+  .doc-bar button:hover { color: #fff; border-color: var(--accent2); background: var(--accent2); }
+  .doc-overlay iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+</style>
 </head>
 <body>
-  <main>
-    <span class="tag">placeholder</span>
-    <h1>Al Dente - Company Brain</h1>
-    <p>Nothing here yet - building a minimal UI is part of the challenge. It must exist and
-    work (a way to send a question to <code>POST /ask</code> and read the answer), but looks
-    are <strong>not graded</strong>: keep it simple and spend your time on the agent.</p>
-    <p>Replace this file (<code>backend/static/index.html</code>) or serve your own frontend.
-    See <code>BRIEF.md</code> and <code>AGENTS.md</code>.</p>
-  </main>
+<header>
+  <span class="logo">🍝</span>
+  <div>
+    <h1>Al Dente · Company Brain</h1>
+    <div class="sub">Ask about customers, production, calls and policies — answered from the live company data.</div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Left: chat -->
+  <div class="col left">
+    <div class="panel-title">Ask</div>
+    <div id="chat">
+      <div class="msg bot"><div class="answer">Ciao! Ask me anything about Al Dente — open opportunities, stock levels, call complaints, product specs, the price list. I'll cite my sources.</div></div>
+    </div>
+    <div class="examples" id="examples"></div>
+    <form id="form">
+      <input id="q" autocomplete="off" placeholder="e.g. How many open opportunities does Primato have?" />
+      <button class="send" id="send" type="submit">Ask</button>
+    </form>
+  </div>
+
+  <!-- Right: knowledge graph -->
+  <div class="col">
+    <div class="panel-title">Knowledge graph · customers ↔ products ↔ raw materials ↔ suppliers</div>
+    <div id="graph"></div>
+    <div class="legend">
+      <span><i class="dot" style="background:#e0b341"></i>Customer</span>
+      <span><i class="dot" style="background:#5b8def"></i>Channel</span>
+      <span><i class="dot" style="background:#4caf7d"></i>Product</span>
+      <span><i class="dot" style="background:#c98b3a"></i>Raw material</span>
+      <span><i class="dot" style="background:#c0392b"></i>Supplier</span>
+    </div>
+
+    <!-- Document viewer overlay (covers the graph when a source doc is opened) -->
+    <div id="docOverlay" class="doc-overlay hidden">
+      <div class="doc-bar">
+        <span class="t" id="docTitle">DOC</span>
+        <button id="docClose" title="Close">✕</button>
+      </div>
+      <iframe id="docFrame" title="Knowledge-base document"></iframe>
+    </div>
+  </div>
+</div>
+
+<script>
+const chat = document.getElementById('chat');
+const form = document.getElementById('form');
+const input = document.getElementById('q');
+const send = document.getElementById('send');
+
+const EXAMPLES = [
+  "How many open opportunities does Primato Supermercati S.p.A. (CUST-0132) have, and their total value?",
+  "Is SKU PAS-PEN-500 below its minimum stock?",
+  "Total value of negotiation opportunities grouped by customer channel.",
+  "What is the shelf life and allergens for Spaghetti n.5 - 500g box (PAS-SPA-500)?",
+  "What is the profit margin on lot LOT-2026-0658?",
+];
+const ex = document.getElementById('examples');
+EXAMPLES.forEach(t => {
+  const b = document.createElement('button');
+  b.textContent = t.length > 52 ? t.slice(0, 50) + '…' : t;
+  b.onclick = () => { input.value = t; input.focus(); };
+  ex.appendChild(b);
+});
+
+function addUser(text) {
+  const d = document.createElement('div');
+  d.className = 'msg user';
+  const body = document.createElement('div');
+  body.className = 'answer md';
+  body.innerHTML = marked.parse(text, { breaks: true });
+  d.appendChild(body);
+  chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
+}
+function addBot() {
+  const d = document.createElement('div');
+  d.className = 'msg bot';
+  d.innerHTML = '<div class="spinner">Thinking…</div>';
+  chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
+  return d;
+}
+function looksLikeHtml(s) { return /<\/?(html|div|section|table|h[1-9]|ul|style|!doctype)/i.test(s); }
+
+function renderAnswer(el, data) {
+  const ans = data.answer || '';
+  let html = '';
+  if (looksLikeHtml(ans)) {
+    const srcdoc = ans.replace(/"/g, '&quot;');
+    html += `<div class="frame"><iframe sandbox="allow-same-origin" srcdoc="${srcdoc}"></iframe></div>`;
+  } else {
+    html += `<div class="answer md"></div>`;
+  }
+  html += `<div class="meta">`;
+  if (data.verticale) html += `<span class="chip vert">${data.verticale}</span>`;
+  (data.sources || []).forEach(s => {
+    if (/^DOC-\d{3}$/.test(s)) {
+      html += `<a class="chip src doc" href="/kb/${s}" data-doc="${s}" title="Open ${s}">📄 ${s}</a>`;
+    } else {
+      html += `<span class="chip src">${s}</span>`;
+    }
+  });
+  html += `</div>`;
+  if (data.artifact_url) {
+    html += `<div class="artifact">📎 <a href="${data.artifact_url}" target="_blank" rel="noopener">Download artifact</a></div>`;
+  }
+  el.innerHTML = html;
+  if (!looksLikeHtml(ans)) {
+    const target = el.querySelector('.answer');
+    target.innerHTML = marked.parse(ans, { breaks: true });
+  }
+  chat.scrollTop = chat.scrollHeight;
+}
+
+form.onsubmit = async (e) => {
+  e.preventDefault();
+  const question = input.value.trim();
+  if (!question) return;
+  addUser(question);
+  input.value = ''; send.disabled = true;
+  const bot = addBot();
+  try {
+    const res = await fetch('/ask', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    });
+    const data = await res.json();
+    renderAnswer(bot, data);
+  } catch (err) {
+    bot.innerHTML = `<div class="answer">Network error: ${err}</div>`;
+  } finally {
+    send.disabled = false; input.focus();
+  }
+};
+
+// Document viewer overlay (load source docs over the graph, closable)
+const docOverlay = document.getElementById('docOverlay');
+const docFrame = document.getElementById('docFrame');
+const docTitle = document.getElementById('docTitle');
+function openDoc(id) {
+  docTitle.textContent = '📄 ' + id;
+  docFrame.src = '/kb/' + id;
+  docOverlay.classList.remove('hidden');
+}
+function closeDoc() {
+  docOverlay.classList.add('hidden');
+  docFrame.src = 'about:blank';
+}
+document.getElementById('docClose').onclick = closeDoc;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDoc(); });
+// Delegated: intercept clicks on document source chips.
+chat.addEventListener('click', (e) => {
+  const link = e.target.closest('a.chip.doc');
+  if (!link) return;
+  e.preventDefault();
+  openDoc(link.dataset.doc);
+});
+
+// Knowledge graph
+const GROUP_COLORS = {
+  customer: '#e0b341', channel: '#5b8def', product: '#4caf7d',
+  raw_material: '#c98b3a', supplier: '#c0392b',
+};
+async function loadGraph() {
+  try {
+    const res = await fetch('/graph');
+    const g = await res.json();
+    if (!g.nodes || !g.nodes.length) {
+      document.getElementById('graph').innerHTML =
+        '<p style="color:#9aa3b2;padding:20px">Graph unavailable.</p>';
+      return;
+    }
+    const nodes = g.nodes.map(n => ({
+      id: n.id, label: n.label, group: n.group,
+      color: GROUP_COLORS[n.group] || '#777',
+      shape: n.group === 'channel' ? 'diamond' : (n.group === 'supplier' ? 'square' : 'dot'),
+      value: n.group === 'channel' ? 30 : 12,
+      font: { color: '#e8eaed', size: 12 },
+    }));
+    const edges = g.edges.map(e => ({
+      from: e.from, to: e.to, arrows: 'to',
+      color: { color: '#3a4150', opacity: 0.6 }, width: 0.7,
+    }));
+    new vis.Network(document.getElementById('graph'),
+      { nodes, edges }, {
+        physics: { stabilization: true, barnesHut: { gravitationalConstant: -8000, springLength: 110 } },
+        interaction: { hover: true, tooltipDelay: 120 },
+        nodes: { borderWidth: 0, scaling: { min: 8, max: 34 } },
+      });
+  } catch (err) {
+    document.getElementById('graph').innerHTML =
+      `<p style="color:#9aa3b2;padding:20px">Graph error: ${err}</p>`;
+  }
+}
+loadGraph();
+</script>
 </body>
 </html>
