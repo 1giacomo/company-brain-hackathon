@@ -2,15 +2,15 @@
 
 **Participant brief - Company Brain Challenge**
 
-| | |
-| --- | --- |
-| Organizer | Yellow Tech |
-| Date | Saturday, June 13th 2026, 9:30 - 20:00 |
-| Venue | Via Polidoro da Caravaggio 37, Milano |
-| Work session | 6 hours |
-| Format | Individual |
-| Environment | Cursor |
-| Prizes | 1st place 1,000 EUR - 2nd place 500 EUR |
+|              |                                         |
+| ------------ | --------------------------------------- |
+| Organizer    | Yellow Tech                             |
+| Date         | Saturday, June 13th 2026, 9:30 - 20:00  |
+| Venue        | Via Polidoro da Caravaggio 37, Milano   |
+| Work session | 6 hours                                 |
+| Format       | Individual                              |
+| Environment  | Cursor                                  |
+| Prizes       | 1st place 1,000 EUR - 2nd place 500 EUR |
 
 > The top 15 overall also earn a direct pass to **Wave** (the Italian Hackathon League final), Turin, 7-9 October 2026.
 
@@ -18,7 +18,7 @@
 
 Build the **company brain** of a food company: an agent that answers requests about the company by querying multiple data sources **on its own**, producing both text answers and artifacts (HTML presentations, documents, and in some cases **downloadable docx / pptx / pdf / xlsx files**).
 
-The company is *Al Dente S.r.l.*, a pasta maker selling dry pasta to supermarkets, distributors and restaurants. You don't know its data: your agent has to fetch it on the fly from the sources we give you.
+The company is _Al Dente S.r.l._, a pasta maker selling dry pasta to supermarkets, distributors and restaurants. You don't know its data: your agent has to fetch it on the fly from the sources we give you.
 
 The heart of the challenge is **orchestration**: building an **agent loop** that understands which tools it needs, calls our APIs efficiently, combines them with a knowledge base you build, and formats the requested output. You win by optimizing and iterating, not by pasting a prompt.
 
@@ -50,11 +50,13 @@ The heart of the challenge is **orchestration**: building an **agent loop** that
 ## 4. What is fixed and what is free
 
 **Fixed:**
+
 - the endpoint schema: `POST /ask` with `{question}` -> `{answer, sources, verticale, artifact_url?}` - already wired in the starter;
 - our APIs are read-only and require the auth header;
 - the only data sources are the ones we provide: no invented or external data.
 
 **Free:**
+
 - the agent architecture and orchestration strategy;
 - the LLM (any model on Regolo.ai or Mistral);
 - how you build the RAG;
@@ -76,6 +78,7 @@ All require the `Authorization` header with **your token**. Your calls are count
 Three levels, from fully automated to fully human.
 
 **Level 1 - automated evaluation.** A set of **~40 hidden requests** is sent to your endpoint. An automated judge compares your answers against an **answer key** we prepared.
+
 - What weighs most is **completeness of the requested data** (did you fetch the right facts?); prose quality matters less.
 - **Inventing a wrong fact costs more** than an honest "not available" (some requests are traps).
 - **Efficiency** (calls to our APIs, data downloaded - measured server-side on your token) counts as a secondary criterion.
@@ -83,6 +86,7 @@ Three levels, from fully automated to fully human.
 - The top projects move on to Level 2.
 
 **Level 2 - human evaluation.** For the top projects, a jury scores what the automated layer cannot, on **three explicit criteria**:
+
 1. **Functioning & usability** - the app works end-to-end and is pleasant to use: a user gets answers without friction.
 2. **Wow & knowledge graph** - the graph visualization of the company's materials/knowledge and the overall visual impact (the "wow" factor).
 3. **Quality of the deliverables** - the generated artifacts (presentations, documents, PDFs, Excel files) are correct and presentable to a client as is.
@@ -103,6 +107,7 @@ The platform also offers an **endpoint check** that validates the `/ask` contrac
 ## 8. Deploy
 
 You publish the app to **Railway** as a **single service**, free for the day ($5 trial, no credit card).
+
 - Locally you work natively (`uv`) or with the provided fallback `docker-compose` (`DOCKER.md`).
 - In the cloud you don't write a Dockerfile: Railway builds on its own (Railpack + the `railway.json` already in the starter).
 - Deploy to a **European region**: the 30-second limit per answer includes network travel, so a closer server leaves more time for real work.
@@ -127,18 +132,18 @@ You publish the app to **Railway** as a **single service**, free for the day ($5
 
 ## 11. The day
 
-| Time | What |
-| --- | --- |
-| 9:30 - 10:00 | Meetup and coffee |
-| 10:15 - 11:00 | Kickoff and intro (plenary briefing, Q&A) |
-| 11:00 - 13:30 | Build time |
-| 13:30 - 14:30 | Lunch break (self-service) |
-| 14:30 - 17:00 | Build time |
-| 17:00 | Project submission deadline |
+| Time          | What                                         |
+| ------------- | -------------------------------------------- |
+| 9:30 - 10:00  | Meetup and coffee                            |
+| 10:15 - 11:00 | Kickoff and intro (plenary briefing, Q&A)    |
+| 11:00 - 13:30 | Build time                                   |
+| 13:30 - 14:30 | Lunch break (self-service)                   |
+| 14:30 - 17:00 | Build time                                   |
+| 17:00         | Project submission deadline                  |
 | 17:00 - 18:30 | Judging (automated evaluation + jury review) |
-| 18:30 - 19:00 | Pitch time for the top 3 |
-| 19:00 - 19:30 | Winners announcement and awards |
-| 19:30 - 20:00 | Networking aperitivo |
+| 18:30 - 19:00 | Pitch time for the top 3                     |
+| 19:00 - 19:30 | Winners announcement and awards              |
+| 19:30 - 20:00 | Networking aperitivo                         |
 
 > Internal timings may shift slightly on the day.
 

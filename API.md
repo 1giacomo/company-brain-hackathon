@@ -16,24 +16,26 @@ All list endpoints: `?limit=&offset=` (default `limit=50`, **max 200**). Respons
 
 Always check `pagination.total` before aggregating - the first page is rarely the whole story.
 
+---
+
 ## Endpoints
 
-| Endpoint | Main filters (exact values) |
-| --- | --- |
-| `GET /crm/customers` | `search`, `channel` (`GDO` / `distributor` / `horeca`), `status` (`active` / `inactive` / `prospect`) |
-| `GET /crm/customers/{id}` | - |
-| `GET /crm/opportunities` | `customer_id`, `stage` (`qualification` / `negotiation` / `won` / `lost`), `owner` |
-| `GET /crm/orders` | `customer_id`, `status` (`open` / `in_production` / `shipped` / `delivered` / `cancelled`), `from`, `to` |
-| `GET /crm/invoices` | `customer_id`, `status` (`unpaid` / `paid` / `overdue`), `order_id` |
-| `GET /calls` | `customer_id`, `type` (`sales` / `support`), `outcome` (`complaint_open` / `follow_up` / `order_placed` / `resolved`), `from`, `to` |
-| `GET /calls/{id}` | - (metadata) |
-| `GET /calls/{id}/transcript` | `search`, `speaker`, `offset`, `limit` (over segments) |
-| `GET /erp/production-orders` | `customer_id`, `status` (`planned` / `in_progress` / `done` / `blocked`), `sku`, `from`, `to` |
-| `GET /erp/inventory` | `type` (`finished_good` / `raw_material`), `below_min` (`true`), `search` |
-| `GET /erp/suppliers` | `search`, `category` (`semolina` / `wheat` / `packaging` / `labels` / `ink` / `logistics`) |
-| `GET /erp/bom` | `sku` (bill of materials of a finished SKU) |
-| `GET /erp/shipments` | `customer_id`, `order_id`, `status` (`in_transit` / `delivered` / `delayed`) |
-| `GET /health` | - (no auth) |
+| Endpoint                     | Main filters (exact values)                                                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /crm/customers`         | `search`, `channel` (`GDO` / `distributor` / `horeca`), `status` (`active` / `inactive` / `prospect`)                               |
+| `GET /crm/customers/{id}`    | -                                                                                                                                   |
+| `GET /crm/opportunities`     | `customer_id`, `stage` (`qualification` / `negotiation` / `won` / `lost`), `owner`                                                  |
+| `GET /crm/orders`            | `customer_id`, `status` (`open` / `in_production` / `shipped` / `delivered` / `cancelled`), `from`, `to`                            |
+| `GET /crm/invoices`          | `customer_id`, `status` (`unpaid` / `paid` / `overdue`), `order_id`                                                                 |
+| `GET /calls`                 | `customer_id`, `type` (`sales` / `support`), `outcome` (`complaint_open` / `follow_up` / `order_placed` / `resolved`), `from`, `to` |
+| `GET /calls/{id}`            | - (metadata)                                                                                                                        |
+| `GET /calls/{id}/transcript` | `search`, `speaker`, `offset`, `limit` (over segments)                                                                              |
+| `GET /erp/production-orders` | `customer_id`, `status` (`planned` / `in_progress` / `done` / `blocked`), `sku`, `from`, `to`                                       |
+| `GET /erp/inventory`         | `type` (`finished_good` / `raw_material`), `below_min` (`true`), `search`                                                           |
+| `GET /erp/suppliers`         | `search`, `category` (`semolina` / `wheat` / `packaging` / `labels` / `ink` / `logistics`)                                          |
+| `GET /erp/bom`               | `sku` (bill of materials of a finished SKU)                                                                                         |
+| `GET /erp/shipments`         | `customer_id`, `order_id`, `status` (`in_transit` / `delivered` / `delayed`)                                                        |
+| `GET /health`                | - (no auth)                                                                                                                         |
 
 Filters are **exact-match and case-sensitive** (`channel=GDO` works, `channel=gdo` returns an empty list - no error). Date filters (`from` / `to`) take ISO dates (`YYYY-MM-DD`).
 
@@ -53,17 +55,17 @@ When `search`/`speaker` filters are active, `pagination.total` counts the **filt
 
 ## ID conventions
 
-| Entity | Format | Example |
-| --- | --- | --- |
-| Customer | `CUST-####` | `CUST-0132` |
-| Opportunity | `OPP-####` | `OPP-2031` |
-| Order | `ORD-2026-####` | `ORD-2026-0517` |
-| Production lot | `LOT-2026-####` | `LOT-2026-0876` |
-| Finished product SKU | `PAS-XXX-###` | `PAS-SPA-500` |
-| Raw material SKU | `RAW-XXX-###` | `RAW-SEM-001` |
-| Supplier | `SUP-###` | `SUP-014` |
-| Call | `CALL-#####` | `CALL-58213` |
-| KB document | `DOC-###` | `DOC-007` |
+| Entity               | Format          | Example         |
+| -------------------- | --------------- | --------------- |
+| Customer             | `CUST-####`     | `CUST-0132`     |
+| Opportunity          | `OPP-####`      | `OPP-2031`      |
+| Order                | `ORD-2026-####` | `ORD-2026-0517` |
+| Production lot       | `LOT-2026-####` | `LOT-2026-0876` |
+| Finished product SKU | `PAS-XXX-###`   | `PAS-SPA-500`   |
+| Raw material SKU     | `RAW-XXX-###`   | `RAW-SEM-001`   |
+| Supplier             | `SUP-###`       | `SUP-014`       |
+| Call                 | `CALL-#####`    | `CALL-58213`    |
+| KB document          | `DOC-###`       | `DOC-007`       |
 
 Cross-source links are real: orders reference customers, production lots reference orders and SKUs, BOM rows link finished SKUs to raw materials, raw materials link to suppliers, calls reference customers and lots. Multi-hop questions follow these chains.
 

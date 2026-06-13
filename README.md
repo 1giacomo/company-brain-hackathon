@@ -48,7 +48,7 @@ Smoke-test against a sample question from SAMPLE_QUESTIONS.md and compare
 with the reference answer.
 ```
 
-Common things to ask Cursor: *"start the dev server"*, *"test /ask with sample question 3"*, *"tail the logs"*, *"deploy to Railway"* (it follows `DEPLOY.md`).
+Common things to ask Cursor: _"start the dev server"_, _"test /ask with sample question 3"_, _"tail the logs"_, _"deploy to Railway"_ (it follows `DEPLOY.md`).
 
 ## Project layout
 

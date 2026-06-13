@@ -129,17 +129,17 @@ railway domain                       # print (or create) the public URL
 
 ## Common issues
 
-| Issue | Fix |
-| --- | --- |
-| `railway: command not found` | `npm install -g @railway/cli` (Windows: see appendix) |
-| `No service could be found` | The CLI lost the link (usually after `--detach`). `railway service <name>`. |
-| Build fails | `railway logs --build`. Most often a typo in `pyproject.toml` deps. |
-| Healthcheck failing | `GET /health` must return `{"status":"ok"}` (already in the template). If you do heavy work at startup (building an index), do it lazily or pre-build locally - the healthcheck times out otherwise. |
-| `/ask` works locally, 401/500 on Railway | An env var is missing on the service: `railway variables` and compare with your local `.env`. |
-| Artifact links point to localhost | You forgot `PUBLIC_BASE_URL` (step 6). |
-| Upload huge (>100MB) or stalls | A `venv/` or `env/` folder (no leading dot) is being uploaded. Rename your virtualenv to `.venv` (auto-excluded). |
-| Service deployed in US | `railway scale --service <name> --europe-west4=1` moves it to EU. Set the default region for next time. |
-| First request slow after deploy | Cold start. Warm up with a couple of `/health` + easy `/ask` calls right after deploying. |
+| Issue                                    | Fix                                                                                                                                                                                                  |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `railway: command not found`             | `npm install -g @railway/cli` (Windows: see appendix)                                                                                                                                                |
+| `No service could be found`              | The CLI lost the link (usually after `--detach`). `railway service <name>`.                                                                                                                          |
+| Build fails                              | `railway logs --build`. Most often a typo in `pyproject.toml` deps.                                                                                                                                  |
+| Healthcheck failing                      | `GET /health` must return `{"status":"ok"}` (already in the template). If you do heavy work at startup (building an index), do it lazily or pre-build locally - the healthcheck times out otherwise. |
+| `/ask` works locally, 401/500 on Railway | An env var is missing on the service: `railway variables` and compare with your local `.env`.                                                                                                        |
+| Artifact links point to localhost        | You forgot `PUBLIC_BASE_URL` (step 6).                                                                                                                                                               |
+| Upload huge (>100MB) or stalls           | A `venv/` or `env/` folder (no leading dot) is being uploaded. Rename your virtualenv to `.venv` (auto-excluded).                                                                                    |
+| Service deployed in US                   | `railway scale --service <name> --europe-west4=1` moves it to EU. Set the default region for next time.                                                                                              |
+| First request slow after deploy          | Cold start. Warm up with a couple of `/health` + easy `/ask` calls right after deploying.                                                                                                            |
 
 ## Submission
 
@@ -193,7 +193,7 @@ set-variables, generate-domain, get-logs); otherwise use the CLI. Steps:
 
 ## Appendix: Railway CLI on Windows
 
-All commands in **PowerShell as Administrator** (Start menu -> search "PowerShell" -> right-click -> *Run as administrator*).
+All commands in **PowerShell as Administrator** (Start menu -> search "PowerShell" -> right-click -> _Run as administrator_).
 
 ```powershell
 # 1. Allow script execution (needed for npm-installed CLIs)

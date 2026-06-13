@@ -8,7 +8,7 @@ Download from https://www.docker.com/products/docker-desktop/ - **no Docker acco
 
 Pick your build:
 
-- **Mac**: Apple Silicon (M1/M2/M3/M4) or Intel chip - check  -> About This Mac if unsure.
+- **Mac**: Apple Silicon (M1/M2/M3/M4) or Intel chip - check -> About This Mac if unsure.
 - **Windows**: AMD64 (the common one) or ARM64. During install, keep the **WSL2** option enabled (default). If Docker asks to enable WSL2/virtualization, accept and reboot.
 - **Linux**: Docker Desktop or plain `docker` + `docker compose` from your package manager.
 
@@ -49,13 +49,13 @@ docker compose -f docker-compose.dev.yml restart      # restart (hot reload misb
 
 ## Troubleshooting
 
-| Problem | Fix |
-| --- | --- |
-| `Cannot connect to the Docker daemon` | Docker Desktop isn't running. Start it and wait for the whale icon. |
-| Port `8000` already in use | Something else is on 8000. Stop it, or change the mapping in `docker-compose.dev.yml` to `"8001:8000"` and use localhost:8001. |
-| Added a dependency but the container doesn't see it | Dependencies install at build time: `docker compose -f docker-compose.dev.yml up -d --build`. |
-| Hot reload stopped working | `docker compose -f docker-compose.dev.yml restart`. |
-| Windows: WSL2 errors at startup | Open PowerShell as Administrator, run `wsl --update`, reboot, restart Docker Desktop. |
-| Changes to `.env` not picked up | Containers read env at start: `down` then `up -d`. |
+| Problem                                             | Fix                                                                                                                            |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `Cannot connect to the Docker daemon`               | Docker Desktop isn't running. Start it and wait for the whale icon.                                                            |
+| Port `8000` already in use                          | Something else is on 8000. Stop it, or change the mapping in `docker-compose.dev.yml` to `"8001:8000"` and use localhost:8001. |
+| Added a dependency but the container doesn't see it | Dependencies install at build time: `docker compose -f docker-compose.dev.yml up -d --build`.                                  |
+| Hot reload stopped working                          | `docker compose -f docker-compose.dev.yml restart`.                                                                            |
+| Windows: WSL2 errors at startup                     | Open PowerShell as Administrator, run `wsl --update`, reboot, restart Docker Desktop.                                          |
+| Changes to `.env` not picked up                     | Containers read env at start: `down` then `up -d`.                                                                             |
 
 If Docker keeps fighting you, switch to the native path (`README.md` -> Quick start): it is one `uv sync` away and a Yellow Tech mentor in the room can help.
