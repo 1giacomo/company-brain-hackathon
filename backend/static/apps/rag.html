@@ -72,6 +72,12 @@ const q = document.getElementById('q');
 const results = document.getElementById('results');
 const hint = document.getElementById('hint');
 
+// Open a document in the OS Preview app (falls back to a new tab if standalone).
+function previewDoc(id) {
+  if (window.parent && window.parent !== window && window.parent.openPreview) window.parent.openPreview(id);
+  else window.open('/kb/' + id, '_blank');
+}
+
 async function run() {
   const query = q.value.trim(); if (!query) return;
   hint.style.display = 'none';
@@ -101,7 +107,7 @@ async function run() {
     }
     results.innerHTML = html;
     results.querySelectorAll('.result').forEach(el =>
-      el.onclick = () => window.open('/kb/' + el.dataset.id, '_blank'));
+      el.onclick = () => previewDoc(el.dataset.id));
   } catch (err) {
     results.innerHTML = `<div class="hint">Error: ${err}</div>`;
   }

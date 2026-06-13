@@ -154,10 +154,12 @@
 // iOS-style app tiles: a vivid two-stop gradient + an iPhone emoji glyph,
 // in the spirit of the Spotify / YouTube / GitHub home-screen icons.
 const APPS = {
-  brain:  { title: "Company Brain",  emoji: "🧠", c1: "#b15cff", c2: "#6d28d9", w: 1040, h: 660 },
-  kb:     { title: "Knowledge Base", emoji: "📚", c1: "#ffd24d", c2: "#ff8a00", w: 900,  h: 600 },
-  rag:    { title: "RAG",            emoji: "🔍", c1: "#2ee6a8", c2: "#0d9488", w: 760,  h: 560 },
-  tables: { title: "API Tables",     emoji: "🗂️", c1: "#5ea8ff", c2: "#2563eb", w: 1000, h: 600 },
+  brain:   { title: "Company Brain",  emoji: "🧠", c1: "#b15cff", c2: "#6d28d9", w: 1040, h: 660 },
+  kb:      { title: "Knowledge Base", emoji: "📚", c1: "#ffd24d", c2: "#ff8a00", w: 900,  h: 600 },
+  rag:     { title: "RAG",            emoji: "🔍", c1: "#2ee6a8", c2: "#0d9488", w: 760,  h: 560 },
+  tables:  { title: "API Tables",     emoji: "🗂️", c1: "#5ea8ff", c2: "#2563eb", w: 1000, h: 600 },
+  // Utility app — launched on demand to view a file (like macOS Preview), no desktop icon.
+  preview: { title: "Preview",        emoji: "🖼️", c1: "#cfd6e2", c2: "#8a93a6", w: 820,  h: 680 },
 };
 const ICON_ORDER = ["brain", "kb", "rag", "tables"];
 
@@ -198,10 +200,13 @@ function focusWin(id) {
   Object.values(openWins).forEach(o => o.el.classList.toggle('focused', o === w));
 }
 
-function openApp(id) {
+function openApp(id, query) {
   const meta = APPS[id];
+  const src = `/apps/${id}${query ? '?' + query : ''}`;
   if (openWins[id]) {                       // already open → restore + focus
-    openWins[id].el.classList.remove('minimized');
+    const w = openWins[id];
+    w.el.classList.remove('minimized');
+    if (query !== undefined) w.el.querySelector('iframe').src = src;  // navigate (e.g. new file)
     focusWin(id);
     return;
   }
@@ -223,7 +228,7 @@ function openApp(id) {
         <button class="tbtn close" title="Close"></button>
       </span>
     </div>
-    <iframe src="/apps/${id}" title="${meta.title}"></iframe>
+    <iframe src="${src}" title="${meta.title}"></iframe>
     <div class="resize"></div>`;
   // titlebar art sizing
   el.querySelector('.ti .art').style.width = '18px';
@@ -243,6 +248,13 @@ function closeApp(id) {
   const w = openWins[id]; if (!w) return;
   w.el.remove(); delete openWins[id]; renderDock();
 }
+
+// Open a document in the Preview app. Called by the desktop AND by child app
+// windows (kb / brain / rag) via window.parent.openPreview(...).
+window.openPreview = function (docId) {
+  if (!docId) return;
+  openApp('preview', 'doc=' + encodeURIComponent(docId));
+};
 
 function makeDraggable(id, el, handle) {
   let sx, sy, ox, oy, dragging = false;

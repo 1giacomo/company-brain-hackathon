@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Preview</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100vh; }
+  body { display: flex; flex-direction: column; overflow: hidden;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: #d9dde4; }
+  /* Toolbar — light, like macOS Preview */
+  .toolbar { height: 44px; flex: none; display: flex; align-items: center; gap: 10px;
+    padding: 0 14px; background: linear-gradient(#fbfbfd, #e9ecf1);
+    border-bottom: 1px solid #c3c8d2; box-shadow: inset 0 1px 0 #fff; }
+  .toolbar .doc-ic { font-size: 17px; }
+  .toolbar .name { font-size: 13px; font-weight: 600; color: #2a2d33; }
+  .toolbar .id { font: 11px ui-monospace, monospace; color: #7b818c;
+    background: #e2e6ec; border: 1px solid #cfd4dd; border-radius: 6px; padding: 1px 7px; }
+  .toolbar .spacer { flex: 1; }
+  .toolbar a.raw { font-size: 12px; color: #2f6fd6; text-decoration: none; }
+  .toolbar a.raw:hover { text-decoration: underline; }
+  /* Scroll area with a centered paper sheet */
+  .stage { flex: 1; overflow: auto; padding: 28px; display: flex; justify-content: center;
+    align-items: flex-start; }
+  .sheet { background: #fff; width: 100%; max-width: 720px; padding: 46px 56px;
+    border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,.18), 0 16px 40px rgba(0,0,0,.18);
+    color: #1c1c1e; line-height: 1.62; font-size: 14.5px; }
+  .sheet h1, .sheet h2, .sheet h3 { line-height: 1.25; }
+  .sheet h1 { font-size: 23px; border-bottom: 2px solid #e0b341; padding-bottom: 9px; margin-top: 0; }
+  .sheet h2 { font-size: 17px; margin-top: 26px; }
+  .sheet table { border-collapse: collapse; margin: 14px 0; width: 100%; }
+  .sheet th, .sheet td { border: 1px solid #d4d8e0; padding: 7px 12px; text-align: left; }
+  .sheet th { background: #f2eede; }
+  .sheet code { background: #eef0f3; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .sheet hr { border: none; border-top: 1px solid #e2e4e8; margin: 22px 0; }
+  .empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #7b818c;
+    font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <span class="doc-ic">📄</span>
+  <span class="name" id="name">Preview</span>
+  <span class="id" id="id"></span>
+  <span class="spacer"></span>
+  <a class="raw" id="raw" target="_blank" rel="noopener">Open raw ↗</a>
+</div>
+<div class="stage" id="stage"><div class="empty" id="empty">No document selected.</div></div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const docId = params.get('doc');
+const stage = document.getElementById('stage');
+
+if (!docId) {
+  document.getElementById('raw').style.display = 'none';
+} else {
+  document.getElementById('id').textContent = docId;
+  document.getElementById('raw').href = '/kb/' + docId;
+  fetch('/api/kb/doc/' + encodeURIComponent(docId))
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(d => {
+      document.getElementById('name').textContent = d.title || docId;
+      stage.innerHTML = '<div class="sheet" id="sheet"></div>';
+      document.getElementById('sheet').innerHTML = marked.parse(d.markdown || '', { breaks: true });
+    })
+    .catch(() => { stage.innerHTML = '<div class="empty">Could not load ' + docId + '.</div>'; });
+}
+</script>
+</body>
+</html>

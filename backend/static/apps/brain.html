@@ -130,15 +130,6 @@
       <span><i class="dot" style="background:#c98b3a"></i>Raw material</span>
       <span><i class="dot" style="background:#c0392b"></i>Supplier</span>
     </div>
-
-    <!-- Document viewer overlay (covers the graph when a source doc is opened) -->
-    <div id="docOverlay" class="doc-overlay hidden">
-      <div class="doc-bar">
-        <span class="t" id="docTitle">DOC</span>
-        <button id="docClose" title="Close">✕</button>
-      </div>
-      <iframe id="docFrame" title="Knowledge-base document"></iframe>
-    </div>
   </div>
 </div>
 
@@ -232,27 +223,17 @@ form.onsubmit = async (e) => {
   }
 };
 
-// Document viewer overlay (load source docs over the graph, closable)
-const docOverlay = document.getElementById('docOverlay');
-const docFrame = document.getElementById('docFrame');
-const docTitle = document.getElementById('docTitle');
-function openDoc(id) {
-  docTitle.textContent = '📄 ' + id;
-  docFrame.src = '/kb/' + id;
-  docOverlay.classList.remove('hidden');
+// Open a cited document in the OS Preview app (falls back to a tab if standalone).
+function previewDoc(id) {
+  if (window.parent && window.parent !== window && window.parent.openPreview) window.parent.openPreview(id);
+  else window.open('/kb/' + id, '_blank');
 }
-function closeDoc() {
-  docOverlay.classList.add('hidden');
-  docFrame.src = 'about:blank';
-}
-document.getElementById('docClose').onclick = closeDoc;
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDoc(); });
 // Delegated: intercept clicks on document source chips.
 chat.addEventListener('click', (e) => {
   const link = e.target.closest('a.chip.doc');
   if (!link) return;
   e.preventDefault();
-  openDoc(link.dataset.doc);
+  previewDoc(link.dataset.doc);
 });
 
 // Knowledge graph

@@ -31,7 +31,7 @@ _KB_DIR = Path(__file__).resolve().parent / "data" / "kb"
 _DOC_ID = re.compile(r"DOC-\d{3}")
 
 # v2 "Al Dente OS" apps (window contents) and the API tables they can explore.
-_APPS = {"brain", "kb", "rag", "tables"}
+_APPS = {"brain", "kb", "rag", "tables", "preview"}
 _TABLES = {
     "customers": "/crm/customers", "opportunities": "/crm/opportunities",
     "orders": "/crm/orders", "invoices": "/crm/invoices", "calls": "/calls",
@@ -122,6 +122,19 @@ def app_window(name: str) -> FileResponse:
 def api_kb_list() -> JSONResponse:
     """List the knowledge-base documents (for the KB file-browser app)."""
     return JSONResponse({"documents": kb.list_docs()})
+
+
+@app.get("/api/kb/doc/{doc_id}", include_in_schema=False)
+def api_kb_doc(doc_id: str) -> JSONResponse:
+    """Raw markdown of one document (for the Preview app to render itself)."""
+    if not _DOC_ID.fullmatch(doc_id):
+        raise HTTPException(status_code=404, detail="not found")
+    path = _KB_DIR / f"{doc_id}.md"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="not found")
+    text = path.read_text(encoding="utf-8")
+    title = text.splitlines()[0].lstrip("# ").strip() if text else doc_id
+    return JSONResponse({"doc_id": doc_id, "title": title, "markdown": text})
 
 
 @app.get("/api/rag", include_in_schema=False)
