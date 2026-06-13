@@ -14,8 +14,15 @@ from typing import Any
 
 from . import artifacts, llm, tools
 
-ROUND_CAP = 7
-DEADLINE_S = 20.0  # leave headroom under the 30s wall for the final synthesis call
+ROUND_CAP = 5
+BUDGET_S = 26.0       # hard wall-clock budget for the whole request (30s eval ceiling)
+MIN_CALL_S = 3.0      # don't start an LLM call with less than this much budget left
+MAX_CALL_S = 12.0     # per-call timeout cap
+
+# Phrases that mark a mid-thought "narration" turn (model planning out loud rather
+# than giving the final answer) — we nudge it to act instead of accepting it.
+_NARRATION = ("let me ", "let's ", "i'll ", "i will ", "i need to ", "first, ",
+              "now i", "checking", "searching", "let me check", "i should ")
 
 # Map each data tool to the verticale it represents (fallback for verticale).
 _TOOL_VERTICALE = {
@@ -139,6 +146,13 @@ def _fallback_verticale(session: tools.Session) -> str:
     return best
 
 
+def _looks_like_narration(text: str) -> bool:
+    low = text.strip().lower()
+    if not low:
+        return False
+    return low.endswith((":", "…", "...")) or any(p in low for p in _NARRATION)
+
+
 def run(question: str) -> dict[str, Any]:
     """Run the agent and return {answer, sources, verticale, artifact_url}."""
     session = tools.Session()
@@ -148,19 +162,34 @@ def run(question: str) -> dict[str, Any]:
     ]
     start = time.monotonic()
     artifact_url: str | None = None
+    remaining = lambda: BUDGET_S - (time.monotonic() - start)  # noqa: E731
 
     for round_i in range(ROUND_CAP):
-        over_deadline = (time.monotonic() - start) > DEADLINE_S
-        if over_deadline:
+        rem = remaining()
+        if rem < MIN_CALL_S:
+            break  # out of budget → finalize below
+        try:
+            msg = llm.chat(messages, tools=_ALL_TOOLS, max_tokens=1400,
+                           timeout=min(MAX_CALL_S, rem - 1.0),
+                           retries=1 if rem > 16 else 0)
+        except Exception as e:  # noqa: BLE001 - stall/transport; finalize from what we have
+            print(f"[agent] llm.chat failed (round {round_i}): {e}")
             break
-        msg = llm.chat(messages, tools=_ALL_TOOLS, max_tokens=1400)
+
         if not msg.tool_calls:
-            # Model answered directly without submit_answer — accept its text.
             text = llm.content_of(msg)
+            # If the model is narrating its plan (not answering) and we still have
+            # rounds + budget, push it to act rather than accepting a mid-thought.
+            if text.strip() and _looks_like_narration(text) and round_i < ROUND_CAP - 1 and remaining() > 6:
+                messages.append({"role": "assistant", "content": text})
+                messages.append({"role": "user", "content":
+                                 "Continue: call the tools you need, then call submit_answer "
+                                 "with the final answer."})
+                continue
             if text.strip():
                 ans, vert = _unwrap(text, session)
+                print(f"[agent] done (text) in {time.monotonic()-start:.1f}s, tools={session.tool_tally}")
                 return _finalize(ans, vert, session, artifact_url)
-            # Empty turn: nudge once more.
             messages.append({"role": "assistant", "content": ""})
             continue
 
@@ -170,6 +199,7 @@ def run(question: str) -> dict[str, Any]:
             args = _args(tc)
             if name == "submit_answer":
                 verticale = args.get("verticale") or _fallback_verticale(session)
+                print(f"[agent] done (submit) in {time.monotonic()-start:.1f}s, tools={session.tool_tally}")
                 return _finalize(args.get("answer", ""), verticale, session,
                                  args.get("artifact_url") or artifact_url)
             if name == "create_artifact":
@@ -186,15 +216,22 @@ def run(question: str) -> dict[str, Any]:
             result = session.run(name, args)
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
-    # Deadline or round cap hit: force a final plain-text answer (no tools).
-    messages.append({"role": "user", "content":
-                     "Time is up. Give your best final answer now from what you have gathered, "
-                     "in one or two sentences. If a value was not available in the sources, say so."})
-    try:
-        final = llm.chat(messages, tools=None, max_tokens=600)
-        text = llm.content_of(final) or "I cannot answer that right now."
-    except Exception:  # noqa: BLE001
-        text = "I cannot answer that right now."
+    # Round cap / budget hit. Run a short forced-final synthesis ONLY if budget allows;
+    # otherwise abstain honestly (an over-30s answer scores as wrong).
+    rem = remaining()
+    print(f"[agent] forced-final, {rem:.1f}s left, tools={session.tool_tally}")
+    if rem > 5:
+        messages.append({"role": "user", "content":
+                         "Time is up. Give your best final answer now from what you have gathered, "
+                         "in one or two sentences. If a value was not available in the sources, say so."})
+        try:
+            final = llm.chat(messages, tools=None, max_tokens=500,
+                             timeout=min(MAX_CALL_S, rem - 1.0), retries=0)
+            text = llm.content_of(final) or "I cannot answer that right now."
+        except Exception:  # noqa: BLE001
+            text = "I cannot answer that right now based on the available sources."
+    else:
+        text = "I cannot answer that right now based on the available sources."
     return _finalize(text, _fallback_verticale(session), session, artifact_url)
 
 
