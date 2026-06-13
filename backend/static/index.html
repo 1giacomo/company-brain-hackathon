@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Al Dente · Company Brain</title>
 <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <style>
   :root {
     --bg: #0f1115; --panel: #181b22; --panel2: #1f232c; --border: #2a2f3a;
@@ -20,7 +21,7 @@
   header h1 { font-size: 17px; margin: 0; font-weight: 600; letter-spacing: .3px; }
   header .sub { color: var(--muted); font-size: 12.5px; }
   .layout { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 53px); }
-  .col { display: flex; flex-direction: column; min-height: 0; }
+  .col { display: flex; flex-direction: column; min-height: 0; position: relative; }
   .col.left { border-right: 1px solid var(--border); }
   .panel-title { padding: 10px 18px; font-size: 12px; text-transform: uppercase;
     letter-spacing: 1px; color: var(--muted); border-bottom: 1px solid var(--border); }
@@ -31,11 +32,34 @@
   .msg.user { align-self: flex-end; background: var(--accent); color: #1a1407; border-bottom-right-radius: 3px; }
   .msg.bot { align-self: flex-start; background: var(--panel2); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
   .msg.bot .answer { white-space: pre-wrap; }
+  /* Markdown rendering inside bot answers */
+  .msg.bot .answer.md { white-space: normal; }
+  .answer.md p { margin: 0 0 8px; }
+  .answer.md p:last-child { margin-bottom: 0; }
+  .answer.md ul, .answer.md ol { margin: 6px 0; padding-left: 20px; }
+  .answer.md li { margin: 2px 0; }
+  .answer.md h1, .answer.md h2, .answer.md h3 { margin: 10px 0 6px; font-size: 15px; }
+  .answer.md code { background: #0c0e13; padding: 1px 5px; border-radius: 4px;
+    font-family: ui-monospace, monospace; font-size: 12.5px; }
+  .answer.md pre { background: #0c0e13; padding: 10px; border-radius: 7px; overflow-x: auto; }
+  .answer.md pre code { padding: 0; }
+  .answer.md table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+  .answer.md th, .answer.md td { border: 1px solid var(--border); padding: 4px 9px; text-align: left; }
+  .answer.md th { background: var(--panel); }
+  .answer.md a { color: var(--green); }
+  .answer.md strong { color: #fff; }
+  /* Markdown inside the gold user bubble: inherit dark text, subtle code bg */
+  .msg.user .answer.md { color: #1a1407; }
+  .msg.user .answer.md strong { color: #1a1407; }
+  .msg.user .answer.md code { background: rgba(0,0,0,.12); }
+  .msg.user .answer.md a { color: #5a3d00; }
   .meta { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .chip { font-size: 11px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border);
     background: #131620; color: var(--muted); }
   .chip.vert { color: var(--accent); border-color: var(--accent); }
   .chip.src { font-family: ui-monospace, monospace; }
+  a.chip.doc { color: var(--green); border-color: var(--green); cursor: pointer; text-decoration: none; }
+  a.chip.doc:hover { background: var(--green); color: #0c0e13; }
   .artifact { margin-top: 9px; }
   .artifact a { color: var(--green); font-weight: 600; }
   .frame { margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background:#fff; }
@@ -59,6 +83,18 @@
     color: var(--muted); border-top: 1px solid var(--border); background: var(--panel); }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+
+  /* Document viewer overlay */
+  .doc-overlay { position: absolute; inset: 0; z-index: 5; background: var(--bg);
+    display: flex; flex-direction: column; }
+  .doc-overlay.hidden { display: none; }
+  .doc-bar { display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 14px 9px 18px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  .doc-bar .t { font: 13px ui-monospace, monospace; color: var(--accent); }
+  .doc-bar button { background: none; border: 1px solid var(--border); color: var(--muted);
+    width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1; }
+  .doc-bar button:hover { color: #fff; border-color: var(--accent2); background: var(--accent2); }
+  .doc-overlay iframe { flex: 1; width: 100%; border: 0; background: #fff; }
 </style>
 </head>
 <body>
@@ -95,6 +131,15 @@
       <span><i class="dot" style="background:#c98b3a"></i>Raw material</span>
       <span><i class="dot" style="background:#c0392b"></i>Supplier</span>
     </div>
+
+    <!-- Document viewer overlay (covers the graph when a source doc is opened) -->
+    <div id="docOverlay" class="doc-overlay hidden">
+      <div class="doc-bar">
+        <span class="t" id="docTitle">DOC</span>
+        <button id="docClose" title="Close">✕</button>
+      </div>
+      <iframe id="docFrame" title="Knowledge-base document"></iframe>
+    </div>
   </div>
 </div>
 
@@ -122,7 +167,10 @@ EXAMPLES.forEach(t => {
 function addUser(text) {
   const d = document.createElement('div');
   d.className = 'msg user';
-  d.textContent = text;
+  const body = document.createElement('div');
+  body.className = 'answer md';
+  body.innerHTML = marked.parse(text, { breaks: true });
+  d.appendChild(body);
   chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
 }
 function addBot() {
@@ -141,17 +189,26 @@ function renderAnswer(el, data) {
     const srcdoc = ans.replace(/"/g, '&quot;');
     html += `<div class="frame"><iframe sandbox="allow-same-origin" srcdoc="${srcdoc}"></iframe></div>`;
   } else {
-    html += `<div class="answer"></div>`;
+    html += `<div class="answer md"></div>`;
   }
   html += `<div class="meta">`;
   if (data.verticale) html += `<span class="chip vert">${data.verticale}</span>`;
-  (data.sources || []).forEach(s => html += `<span class="chip src">${s}</span>`);
+  (data.sources || []).forEach(s => {
+    if (/^DOC-\d{3}$/.test(s)) {
+      html += `<a class="chip src doc" href="/kb/${s}" data-doc="${s}" title="Open ${s}">📄 ${s}</a>`;
+    } else {
+      html += `<span class="chip src">${s}</span>`;
+    }
+  });
   html += `</div>`;
   if (data.artifact_url) {
     html += `<div class="artifact">📎 <a href="${data.artifact_url}" target="_blank" rel="noopener">Download artifact</a></div>`;
   }
   el.innerHTML = html;
-  if (!looksLikeHtml(ans)) el.querySelector('.answer').textContent = ans;
+  if (!looksLikeHtml(ans)) {
+    const target = el.querySelector('.answer');
+    target.innerHTML = marked.parse(ans, { breaks: true });
+  }
   chat.scrollTop = chat.scrollHeight;
 }
 
@@ -175,6 +232,29 @@ form.onsubmit = async (e) => {
     send.disabled = false; input.focus();
   }
 };
+
+// Document viewer overlay (load source docs over the graph, closable)
+const docOverlay = document.getElementById('docOverlay');
+const docFrame = document.getElementById('docFrame');
+const docTitle = document.getElementById('docTitle');
+function openDoc(id) {
+  docTitle.textContent = '📄 ' + id;
+  docFrame.src = '/kb/' + id;
+  docOverlay.classList.remove('hidden');
+}
+function closeDoc() {
+  docOverlay.classList.add('hidden');
+  docFrame.src = 'about:blank';
+}
+document.getElementById('docClose').onclick = closeDoc;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDoc(); });
+// Delegated: intercept clicks on document source chips.
+chat.addEventListener('click', (e) => {
+  const link = e.target.closest('a.chip.doc');
+  if (!link) return;
+  e.preventDefault();
+  openDoc(link.dataset.doc);
+});
 
 // Knowledge graph
 const GROUP_COLORS = {
