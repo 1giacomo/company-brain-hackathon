@@ -40,20 +40,20 @@ cd backend && set -a && source .env && set +a && uv run python eval_agent.py
 
 ## Configuration (`backend/.env`)
 
-| Var | What |
-| --- | --- |
-| `LLM_BASE_URL` | `https://api.regolo.ai/v1` (or Mistral) |
-| `LLM_API_KEY` | your provider key |
-| `MODEL` | `qwen3.5-122b` (chosen via the eval A/B; must support tool calling) |
-| `MOCK_API_BASE_URL` | `https://aldente.yellowtest.it` |
-| `MOCK_API_TOKEN` | your token from the platform dashboard |
-| `PUBLIC_BASE_URL` | this backend's public URL (Railway in prod; localhost otherwise) — drives `artifact_url` |
+| Var                 | What                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `LLM_BASE_URL`      | `https://api.regolo.ai/v1` (or Mistral)                                                  |
+| `LLM_API_KEY`       | your provider key                                                                        |
+| `MODEL`             | `qwen3.5-122b` (chosen via the eval A/B; must support tool calling)                      |
+| `MOCK_API_BASE_URL` | `https://aldente.yellowtest.it`                                                          |
+| `MOCK_API_TOKEN`    | your token from the platform dashboard                                                   |
+| `PUBLIC_BASE_URL`   | this backend's public URL (Railway in prod; localhost otherwise) — drives `artifact_url` |
 
 Never commit `.env` (git-ignored). In prod it's also stored as GitHub Actions secrets and set on Railway.
 
 ## Project layout
 
-```
+```tree
 .
 ├── AGENTS.md                # Full spec + Implementation (current state)  (CLAUDE.md → symlink)
 ├── API.md                   # Al Dente mock API reference
