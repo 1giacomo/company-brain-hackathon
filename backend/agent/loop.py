@@ -9,13 +9,21 @@ pagination live in the tools. Stops on `submit_answer`, a round cap, or a
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Any
 
 from . import artifacts, llm, tools
 
-ROUND_CAP = 7
-DEADLINE_S = 20.0  # leave headroom under the 30s wall for the final synthesis call
+ROUND_CAP = 5
+BUDGET_S = 26.0       # hard wall-clock budget for the whole request (30s eval ceiling)
+MIN_CALL_S = 3.0      # don't start an LLM call with less than this much budget left
+MAX_CALL_S = 12.0     # per-call timeout cap
+
+# Phrases that mark a mid-thought "narration" turn (model planning out loud rather
+# than giving the final answer) — we nudge it to act instead of accepting it.
+_NARRATION = ("let me ", "let's ", "i'll ", "i will ", "i need to ", "first, ",
+              "now i", "checking", "searching", "let me check", "i should ")
 
 # Map each data tool to the verticale it represents (fallback for verticale).
 _TOOL_VERTICALE = {
@@ -36,14 +44,25 @@ lots, inventory, suppliers, bill of materials, shipments), calls (call logs + tr
 kb (spec sheets, quality/returns policies, the 2026 wholesale price list, customer capitolati).
 
 RULES:
-- Use ONLY data from the tools. Never invent figures, names, statuses or documents.
-- Verify a named entity exists before answering about it. If a customer/SKU/lot is not found, \
-say so specifically (e.g. "There is no customer named X in the CRM") — do not guess.
-- Some questions are traps: the figure simply does not exist in any source (e.g. profit margin \
-or cost — these are NOT stored anywhere). Say plainly that it is not available and name what \
-is missing. A specific honest "not available" is the correct answer.
-- For "how many" / "total value" / grouped questions, use the tool's `aggregate` parameter so \
-the count/sum is computed over ALL rows in code — never add up numbers yourself.
+- GROUNDING: every fact in your answer must come verbatim from a tool result in THIS \
+conversation. If you did not retrieve it with a tool, you do not know it — do not state it.
+- ABSTAIN WHEN UNSURE: if the data is missing, the entity does not exist, or you are not \
+certain, answer exactly that the information is not available in the sources. A wrong answer is \
+far worse than an honest "not available" — never guess to seem helpful.
+- Verify a named entity exists before answering about it: call the lookup tool first. If a \
+customer/SKU/lot is not found (total=0), say so specifically (e.g. "There is no customer named \
+X in the CRM") — do not substitute a similar-sounding one.
+- TRAPS: some figures are not stored in ANY source — profit margin, cost, COGS, profitability, \
+revenue, salaries, headcount, market share, forecasts. If asked for one, state plainly it is \
+not available and name what is missing. Do not estimate or derive it.
+- For "how many" / "total value" / grouped questions, ALWAYS use the tool's `aggregate` \
+parameter so the count/sum is computed over ALL rows in code — never list rows and count or add \
+them up yourself.
+- To find OR count calls about a specific defect/topic (e.g. 'foreign body', 'delivery delay', \
+'broken pasta'), you MUST set `text_contains` to that phrase. Counting calls without it returns \
+the TOTAL number of calls (e.g. 80), which is the wrong answer.
+- Read structured fields verbatim from the tool result — report `on_hand`, `min_stock` and the \
+`below_min` flag exactly as returned; never infer or compute whether something is below minimum.
 - For "last"/"most recent", use latest=true.
 - When a phone call and an official document disagree, the official document is authoritative.
 - Price-list (DOC-015) prices are PER CARTON (20 x 500g units), even though the table header \
@@ -109,10 +128,31 @@ def _assistant_dict(msg: Any) -> dict[str, Any]:
     return out
 
 
+_PARAM_ANSWER = re.compile(r"<parameter[^>]*answer[^>]*>\s*(.*?)\s*</parameter>", re.S | re.I)
+_PARAM_VERT = re.compile(r"<parameter[^>]*verticale[^>]*>\s*(\w+)\s*</parameter>", re.S | re.I)
+_STRAY_TAGS = re.compile(r"</?(tool_call|function|parameter)[^>]*>", re.I)
+_FENCE_OPEN = re.compile(r"^```[a-zA-Z]*\s*\n")
+_FENCE_CLOSE = re.compile(r"\n```\s*$")
+
+
+def _clean_answer(text: str) -> str:
+    """Strip artifacts some models emit: a tool-call rendered as text
+    (<function=submit_answer><parameter=answer>…), and markdown code fences
+    wrapping the whole answer (```html … ```)."""
+    t = text.strip()
+    m = _PARAM_ANSWER.search(t)
+    if m:
+        t = m.group(1).strip()
+    t = _STRAY_TAGS.sub("", t)
+    t = _FENCE_OPEN.sub("", t.strip())
+    t = _FENCE_CLOSE.sub("", t.strip())
+    return t.strip()
+
+
 def _unwrap(text: str, session: "tools.Session") -> tuple[str, str]:
-    """Some models emit the structured answer as plain JSON text instead of
-    calling submit_answer. Unwrap {"answer":..., "verticale":...} if present;
-    otherwise treat the text as the answer and infer the verticale."""
+    """Some models emit the structured answer as text instead of calling
+    submit_answer — as JSON, or as a literal <function=submit_answer> tool-call.
+    Recover the answer + verticale from either; else treat text as the answer."""
     s = text.strip()
     if s.startswith("{") and '"answer"' in s:
         try:
@@ -120,10 +160,14 @@ def _unwrap(text: str, session: "tools.Session") -> tuple[str, str]:
             ans = obj.get("answer")
             if isinstance(ans, str) and ans.strip():
                 vert = obj.get("verticale") or _fallback_verticale(session)
-                return ans, vert
+                return _clean_answer(ans), vert
         except json.JSONDecodeError:
             pass
-    return text, _fallback_verticale(session)
+    if "<parameter" in s.lower() and "answer" in s.lower():
+        vm = _PARAM_VERT.search(s)
+        vert = vm.group(1) if vm else _fallback_verticale(session)
+        return _clean_answer(s), vert
+    return _clean_answer(s), _fallback_verticale(session)
 
 
 def _fallback_verticale(session: tools.Session) -> str:
@@ -139,6 +183,13 @@ def _fallback_verticale(session: tools.Session) -> str:
     return best
 
 
+def _looks_like_narration(text: str) -> bool:
+    low = text.strip().lower()
+    if not low:
+        return False
+    return low.endswith((":", "…", "...")) or any(p in low for p in _NARRATION)
+
+
 def run(question: str) -> dict[str, Any]:
     """Run the agent and return {answer, sources, verticale, artifact_url}."""
     session = tools.Session()
@@ -148,19 +199,34 @@ def run(question: str) -> dict[str, Any]:
     ]
     start = time.monotonic()
     artifact_url: str | None = None
+    remaining = lambda: BUDGET_S - (time.monotonic() - start)  # noqa: E731
 
     for round_i in range(ROUND_CAP):
-        over_deadline = (time.monotonic() - start) > DEADLINE_S
-        if over_deadline:
+        rem = remaining()
+        if rem < MIN_CALL_S:
+            break  # out of budget → finalize below
+        try:
+            msg = llm.chat(messages, tools=_ALL_TOOLS, max_tokens=1400,
+                           timeout=min(MAX_CALL_S, rem - 1.0),
+                           retries=1 if rem > 16 else 0)
+        except Exception as e:  # noqa: BLE001 - stall/transport; finalize from what we have
+            print(f"[agent] llm.chat failed (round {round_i}): {e}")
             break
-        msg = llm.chat(messages, tools=_ALL_TOOLS, max_tokens=1400)
+
         if not msg.tool_calls:
-            # Model answered directly without submit_answer — accept its text.
             text = llm.content_of(msg)
+            # If the model is narrating its plan (not answering) and we still have
+            # rounds + budget, push it to act rather than accepting a mid-thought.
+            if text.strip() and _looks_like_narration(text) and round_i < ROUND_CAP - 1 and remaining() > 6:
+                messages.append({"role": "assistant", "content": text})
+                messages.append({"role": "user", "content":
+                                 "Continue: call the tools you need, then call submit_answer "
+                                 "with the final answer."})
+                continue
             if text.strip():
                 ans, vert = _unwrap(text, session)
+                print(f"[agent] done (text) in {time.monotonic()-start:.1f}s, tools={session.tool_tally}")
                 return _finalize(ans, vert, session, artifact_url)
-            # Empty turn: nudge once more.
             messages.append({"role": "assistant", "content": ""})
             continue
 
@@ -170,6 +236,7 @@ def run(question: str) -> dict[str, Any]:
             args = _args(tc)
             if name == "submit_answer":
                 verticale = args.get("verticale") or _fallback_verticale(session)
+                print(f"[agent] done (submit) in {time.monotonic()-start:.1f}s, tools={session.tool_tally}")
                 return _finalize(args.get("answer", ""), verticale, session,
                                  args.get("artifact_url") or artifact_url)
             if name == "create_artifact":
@@ -186,22 +253,29 @@ def run(question: str) -> dict[str, Any]:
             result = session.run(name, args)
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
-    # Deadline or round cap hit: force a final plain-text answer (no tools).
-    messages.append({"role": "user", "content":
-                     "Time is up. Give your best final answer now from what you have gathered, "
-                     "in one or two sentences. If a value was not available in the sources, say so."})
-    try:
-        final = llm.chat(messages, tools=None, max_tokens=600)
-        text = llm.content_of(final) or "I cannot answer that right now."
-    except Exception:  # noqa: BLE001
-        text = "I cannot answer that right now."
+    # Round cap / budget hit. Run a short forced-final synthesis ONLY if budget allows;
+    # otherwise abstain honestly (an over-30s answer scores as wrong).
+    rem = remaining()
+    print(f"[agent] forced-final, {rem:.1f}s left, tools={session.tool_tally}")
+    if rem > 5:
+        messages.append({"role": "user", "content":
+                         "Time is up. Give your best final answer now from what you have gathered, "
+                         "in one or two sentences. If a value was not available in the sources, say so."})
+        try:
+            final = llm.chat(messages, tools=None, max_tokens=500,
+                             timeout=min(MAX_CALL_S, rem - 1.0), retries=0)
+            text = llm.content_of(final) or "I cannot answer that right now."
+        except Exception:  # noqa: BLE001
+            text = "I cannot answer that right now based on the available sources."
+    else:
+        text = "I cannot answer that right now based on the available sources."
     return _finalize(text, _fallback_verticale(session), session, artifact_url)
 
 
 def _finalize(answer: str, verticale: str, session: tools.Session,
               artifact_url: str | None) -> dict[str, Any]:
     return {
-        "answer": answer.strip() or "I cannot answer that right now.",
+        "answer": _clean_answer(answer) or "I cannot answer that right now.",
         "sources": sorted(session.sources),
         "verticale": verticale if verticale in ("crm", "erp", "calls", "kb") else "kb",
         "artifact_url": artifact_url,

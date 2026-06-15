@@ -44,8 +44,12 @@ _AGG = {
 TOOL_SCHEMAS: list[dict[str, Any]] = [
     {"type": "function", "function": {
         "name": "crm_customers",
-        "description": "Search/list customers. Retries name spelling variants before reporting none. "
-                       "Use to verify a customer exists before answering about it.",
+        "description": "Search/list customers — ALWAYS start here for a CRM question to resolve the "
+                       "customer's id, then query opportunities/orders/invoices by that customer_id. "
+                       "Tolerates spelling/case/spacing (exact + fuzzy). Returns matched customers WITH "
+                       "their ids. If the result has match='fuzzy', confirm the company_name truly "
+                       "matches before answering. If total=0, the customer does NOT exist — say so; "
+                       "do not guess.",
         "parameters": {"type": "object", "properties": {
             "search": {"type": "string", "description": "Company name (full or partial)."},
             "channel": {"type": "string", "enum": ["GDO", "distributor", "horeca"]},
@@ -88,15 +92,22 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         }}}},
     {"type": "function", "function": {
         "name": "calls_list",
-        "description": "List call logs (metadata incl. 'topic', 'summary', 'related_lot_id', 'date'). "
-                       "The defect/complaint is in 'topic'/'summary' — no transcript needed to count "
-                       "defects. Types: sales, support. Outcomes: complaint_open, follow_up, "
-                       "order_placed, resolved. Set latest=true for the most recent call.",
+        "description": "List/aggregate call logs (metadata incl. 'topic', 'summary', 'related_lot_id', "
+                       "'date'). The defect/complaint is in 'topic'/'summary' — no transcript needed to "
+                       "find or count defects. To find or count calls about a specific defect/topic "
+                       "(e.g. 'foreign body', 'delivery delay', 'broken pasta') you MUST set "
+                       "text_contains to that phrase — otherwise you get ALL calls, not the matching "
+                       "ones. Types: sales, support. Outcomes: complaint_open, follow_up, order_placed, "
+                       "resolved. Set latest=true for the most recent call.",
         "parameters": {"type": "object", "properties": {
             "customer_id": {"type": "string"},
             "type": {"type": "string", "enum": ["sales", "support"]},
             "outcome": {"type": "string",
                         "enum": ["complaint_open", "follow_up", "order_placed", "resolved"]},
+            "text_contains": {"type": "string",
+                              "description": "Keep only calls whose topic/summary mentions this phrase "
+                                             "(case-insensitive). Use for 'which call about X' / counting "
+                                             "calls by defect. For a count, combine with aggregate.op=count."},
             "date_from": {"type": "string"}, "date_to": {"type": "string"},
             "latest": {"type": "boolean", "description": "Return only the most recent call (by date)."},
             "aggregate": _AGG,
@@ -229,13 +240,19 @@ class Session:
             filters = {"customer_id": args.get("customer_id"), "type": args.get("type"),
                        "outcome": args.get("outcome"), "from": args.get("date_from"),
                        "to": args.get("date_to")}
+            tc = args.get("text_contains")
             if args.get("aggregate"):
-                return self._aggregate("/calls", args["aggregate"], filters)
+                agg = dict(args["aggregate"])
+                if tc and not agg.get("text_contains"):  # honor top-level filter in the count
+                    agg["text_contains"] = tc
+                return self._aggregate("/calls", agg, filters)
             self._src("calls")
             rows = aldente.fetch_all("/calls", **filters)
+            if tc:
+                rows = [r for r in rows if aldente._row_contains(r, tc)]
             if args.get("latest"):
                 latest = aldente.latest_by(rows, "date")
-                return {"latest_call": latest, "total_calls_for_filter": len(rows)}
+                return {"latest_call": latest, "matched_calls": len(rows)}
             return self._cap(rows, "calls")
         if name == "call_transcript":
             self._src(f"calls/{args['call_id']}/transcript")

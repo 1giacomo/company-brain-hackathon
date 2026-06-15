@@ -1,99 +1,98 @@
-# Al Dente Company Brain - Starter
+# Al Dente Company Brain
 
-Starter project for the Coding Agent Hackathon powered by Cursor. Build the **company brain** of Al Dente S.r.l.: an agent that answers questions about the company by orchestrating its CRM / ERP / call-log APIs and a knowledge base you build.
+The **company brain** of Al Dente S.r.l. (a pasta maker): an agent that answers questions about the company by orchestrating its CRM / ERP / call-log APIs plus a knowledge base, and serves it all through a simulated-OS web UI.
 
-> **Read `BRIEF.md` first** (the challenge, evaluation, rules). Then **`AGENTS.md`** (full technical spec - Cursor reads it automatically as project context). `API.md` documents the company APIs; `SAMPLE_QUESTIONS.md` shows what the evaluator asks.
-> For deployment read `DEPLOY.md`; for the Docker fallback read `DOCKER.md`. This README is only setup and quick start.
+Built for the Coding Agent Hackathon. The public contract is `POST /ask` (frozen schema); the rest is a desktop-style frontend with windowed apps.
 
-## Prerequisites
+> Background docs: **`AGENTS.md`** is the full spec + an "Implementation (current state)" section describing the codebase. `API.md` documents the company APIs, `SAMPLE_QUESTIONS.md` the evaluator's question shapes, `DEPLOY.md` the Railway deploy, `DOCKER.md` the Docker fallback. This README is setup + overview.
 
-- **Cursor** with the event coupon redeemed
-- **Railway account** (free, https://railway.com) + **Railway CLI** - see `DEPLOY.md`
-- **Python 3.12+ and [uv](https://docs.astral.sh/uv/)** (`curl -LsSf https://astral.sh/uv/install.sh | sh`) - or **Docker Desktop** as fallback (`DOCKER.md`)
-- An **LLM provider key** (Regolo.ai or Mistral free tier - see `BRIEF.md`)
-- Your **mock-API token** from the event platform dashboard
+## What's built
 
-## Quick start (native - recommended)
+- **Agent loop** (`backend/agent/`) — a single tool-calling loop over the Al Dente APIs and the KB, with a hard 26s wall-clock budget, grounding/abstention rules (honest "not available" on traps), pagination-aware aggregation, and answer sanitization.
+- **RAG** — whole-document BM25 over `backend/data/kb/` with a hard variant filter (SKU / Bio / format) to disambiguate near-identical spec sheets. No embeddings, no infra.
+- **`POST /ask`** — the frozen, public, no-auth endpoint the evaluator hits; always HTTP 200, < 30s.
+- **"Al Dente OS"** — the UI at `GET /`: a desktop with draggable windows and discomorphism icons. Apps: **Company Brain** (chat + the "Fusilli" mascot), **Knowledge Base** (Finder-style browser), **RAG** (retrieval playground + knowledge graph), **API Tables** (table explorer), **Preview** (doc viewer).
+- **Eval harness** (`backend/eval_agent.py`) — runs the 12 sample questions + stress probes, reporting correct/wrong/abstain + latency p50/p95.
+
+## Quick start
 
 ```bash
 cd backend/
-cp .env.example .env        # then fill in your keys and token
+cp .env.example .env        # then fill in your keys and token (see below)
 uv sync
 uv run uvicorn main:app --reload --port 8000
 ```
 
-Open http://localhost:8000 - a placeholder page (your minimal UI replaces it). API docs at http://localhost:8000/docs. `/ask` returns 501: implementing it is the challenge.
+Open **http://localhost:8000** for the Al Dente OS UI. API docs at `/docs`. Try the endpoint directly:
 
-**Fallback with Docker**: `docker compose -f docker-compose.dev.yml up -d` from the starter root (see `DOCKER.md`).
-
-## Working with Cursor
-
-Open this folder in Cursor. The project rules (`.cursor/rules/` + `AGENTS.md`) are picked up automatically. Kickoff prompt for your first message:
-
-```
-Read AGENTS.md and API.md fully, confirm the constraints (frozen /ask
-schema with artifact_url, 30s latency cap, verticali crm/erp/calls/kb,
-honest abstention on traps, efficiency measured server-side).
-
-Then implement POST /ask in backend/main.py as an agent loop:
-- tools for the Al Dente APIs (use MOCK_API_TOKEN from .env, handle
-  pagination: check pagination.total, don't aggregate a single page)
-- a retrieval tool over backend/data/kb/ (documents are small - whole-doc
-  retrieval is a fine start)
-- routing: set "verticale" to the dominant source of the answer
-- arithmetic in code, not in the prompt
-- LLM via the OpenAI SDK with LLM_BASE_URL/LLM_API_KEY/MODEL from .env
-
-Smoke-test against a sample question from SAMPLE_QUESTIONS.md and compare
-with the reference answer.
+```bash
+curl -s -X POST localhost:8000/ask -H 'Content-Type: application/json' \
+  -d '{"question":"Is SKU PAS-PEN-500 below its minimum stock?"}'
 ```
 
-Common things to ask Cursor: _"start the dev server"_, _"test /ask with sample question 3"_, _"tail the logs"_, _"deploy to Railway"_ (it follows `DEPLOY.md`).
+Run the local eval (needs the env loaded):
+
+```bash
+cd backend && set -a && source .env && set +a && uv run python eval_agent.py
+```
+
+**Docker fallback**: `docker compose -f docker-compose.dev.yml up -d` (see `DOCKER.md`).
+
+## Configuration (`backend/.env`)
+
+| Var                 | What                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `LLM_BASE_URL`      | `https://api.regolo.ai/v1` (or Mistral)                                                  |
+| `LLM_API_KEY`       | your provider key                                                                        |
+| `MODEL`             | `qwen3.5-122b` (chosen via the eval A/B; must support tool calling)                      |
+| `MOCK_API_BASE_URL` | `https://aldente.yellowtest.it`                                                          |
+| `MOCK_API_TOKEN`    | your token from the platform dashboard                                                   |
+| `PUBLIC_BASE_URL`   | this backend's public URL (Railway in prod; localhost otherwise) — drives `artifact_url` |
+
+Never commit `.env` (git-ignored). In prod it's also stored as GitHub Actions secrets and set on Railway.
 
 ## Project layout
 
-```
+```tree
 .
-├── BRIEF.md                 # The challenge - read first
-├── AGENTS.md                # Full technical spec (Cursor context)
+├── AGENTS.md                # Full spec + Implementation (current state)  (CLAUDE.md → symlink)
 ├── API.md                   # Al Dente mock API reference
 ├── SAMPLE_QUESTIONS.md      # 12 public questions WITH answers
-├── DEPLOY.md                # Railway deploy, step by step + Cursor prompt
-├── DOCKER.md                # Docker fallback dev environment
-├── docker-compose.dev.yml   # (fallback) dev container
-├── Dockerfile.dev           # (fallback) dev image - NOT used by Railway
-├── .cursor/rules/           # Cursor project rules
-└── backend/                 # Everything you deploy
-    ├── main.py              # FastAPI app - /ask is yours to implement
-    ├── pyproject.toml       # deps (uv); RAG/artifact libs commented
-    ├── railway.json         # Railway config (Railpack, no Dockerfile)
-    ├── .env.example         # template for your keys
-    ├── static/index.html    # placeholder - YOUR minimal UI goes here (required, not graded)
-    ├── static/files/        # generated binary artifacts, served at /files/
-    └── data/kb/             # 35 company documents - build your RAG here
+├── DEPLOY.md / DOCKER.md    # Railway deploy / Docker fallback
+├── PLAN.md / PLAN_V2.md / PLAN_V3.md   # design docs (agent, OS UI, performance)
+└── backend/                 # Everything that gets deployed
+    ├── main.py              # FastAPI: /ask, /apps/*, /api/*, /graph, /kb/*, /files/
+    ├── agent/               # the agent
+    │   ├── loop.py          #   tool-calling loop (budget, grounding, verticale)
+    │   ├── tools.py         #   tool schemas + dispatch + source tracking
+    │   ├── aldente.py       #   Al Dente API client (pagination, aggregate, fuzzy customer search)
+    │   ├── kb.py            #   whole-doc BM25 RAG + hard variant filter
+    │   ├── llm.py           #   OpenAI-compatible client (budgeted timeouts)
+    │   ├── artifacts.py     #   inline HTML + binary docx/pptx/pdf/xlsx
+    │   └── graph.py         #   cached knowledge-graph data
+    ├── eval_agent.py        # local eval harness
+    ├── static/              # Al Dente OS UI
+    │   ├── index.html       #   desktop shell + window manager + disco icons
+    │   ├── apps/            #   brain · kb · rag · tables · preview
+    │   └── files/           #   generated binary artifacts, served at /files/
+    └── data/kb/             # 35 company documents (the RAG corpus)
 ```
 
 ## Constraints recap (details in `AGENTS.md`)
 
-- `POST /ask`: `{"question"}` -> `{"answer", "sources", "verticale", "artifact_url"?}`. Frozen, public, no auth, no streaming, HTTP 200 always.
-- **30 seconds** max per question.
-- Only the provided sources (APIs + `data/kb/`). Never invent data - traps exist, honesty wins.
+- `POST /ask`: `{"question"}` → `{"answer", "sources", "verticale", "artifact_url"?}`. Frozen, public, no auth, no streaming, HTTP 200 always.
+- **30 seconds** max per question (the agent enforces a 26s budget and abstains rather than time out).
+- Only the provided sources (APIs + `data/kb/`). Never invent data — traps exist, honest abstention wins.
 - Efficiency is measured **server-side** via your API token: targeted calls beat bulk downloads.
-- Never commit `.env`.
 
-## Submission
+## Deploy & submit
 
-On the event platform, by **16:30**:
-
-- Your **backend public URL** (Railway) - the evaluator hits `<url>/ask`
-- Your **repo** (zip) and a short description of your approach (~200 words)
-
-If the URL is down at evaluation time, Level 1 scores collapse. **Deploy around hour 3** (`DEPLOY.md`), run the platform endpoint check, keep it up.
+Deploy the `backend/` to Railway (`DEPLOY.md`), set the env vars (and `PUBLIC_BASE_URL` to the Railway URL), run the platform endpoint check, and submit the backend URL + repo. Keep the URL up during evaluation.
 
 ## Troubleshooting
 
-- **`uv: command not found`**: install uv (link above) or use the Docker fallback.
-- **`/ask` returns 501**: expected - you haven't implemented it yet.
-- **401 from the Al Dente APIs**: `MOCK_API_TOKEN` missing/wrong in `.env` - copy it from the platform dashboard.
-- **LLM 401/404**: check `LLM_BASE_URL`, `LLM_API_KEY` and `MODEL` (Regolo ids are case-sensitive).
-- **Deploy issues**: `DEPLOY.md` -> Common issues, or ask a Yellow Tech mentor in the room.
+- **`uv: command not found`**: install uv (`curl -LsSf https://astral.sh/uv/install.sh | sh`) or use the Docker fallback.
+- **401 from the Al Dente APIs**: `MOCK_API_TOKEN` missing/wrong in `.env`.
+- **LLM 401/404**: check `LLM_BASE_URL`, `LLM_API_KEY`, `MODEL` (Regolo ids are case-sensitive).
+- **Artifact links point to localhost**: set `PUBLIC_BASE_URL` to the deployed URL.
+- **Deploy issues**: `DEPLOY.md` → Common issues.
